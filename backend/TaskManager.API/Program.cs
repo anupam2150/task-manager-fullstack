@@ -22,11 +22,12 @@ builder.Services.AddControllers();
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseSqlite(builder.Configuration.GetConnectionString("Default")));
 
-builder.Services.AddScoped<JwtService>();
-
 var jwtKey = Environment.GetEnvironmentVariable("JWT__Key")
     ?? builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("JWT Key is not configured.");
+
+builder.Services.AddScoped<JwtService>(sp =>
+    new JwtService(builder.Configuration, jwtKey));
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opt =>

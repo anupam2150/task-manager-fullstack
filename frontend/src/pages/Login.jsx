@@ -16,8 +16,10 @@ export default function Login() {
       setError('');
       await login(form.email, form.password);
       navigate('/');
-    } catch {
-      setError('Invalid email or password.');
+    } catch (err) {
+      const data = err.response?.data;
+      if (typeof data === 'string') setError(data);
+      else setError('Invalid email or password.');
     } finally {
       setLoading(false);
     }

@@ -5,6 +5,14 @@ import api from '../api/api';
 const STATUSES = ['Todo', 'InProgress', 'Done'];
 const PRIORITIES = ['Low', 'Medium', 'High'];
 
+const extractError = (err, fallback) => {
+  const data = err.response?.data;
+  if (typeof data === 'string') return data;
+  if (data?.errors) return Object.values(data.errors).flat().join(' ');
+  if (data?.title) return data.title;
+  return fallback;
+};
+
 export default function Tasks() {
   const { projectId } = useParams();
   const safeProjectId = parseInt(projectId, 10);
@@ -20,8 +28,8 @@ export default function Tasks() {
       setLoading(true);
       const { data } = await api.get(`/projects/${safeProjectId}/tasks`);
       setTasks(data.items ?? data);
-    } catch {
-      setError('Failed to load tasks. Please try again.');
+    } catch (err) {
+      setError(extractError(err, 'Failed to load tasks. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -41,8 +49,8 @@ export default function Tasks() {
       });
       setForm({ title: '', description: '', priority: 'Medium', dueDate: '' });
       load();
-    } catch {
-      setError('Failed to create task. Please try again.');
+    } catch (err) {
+      setError(extractError(err, 'Failed to create task. Please try again.'));
     } finally {
       setSubmitting(false);
     }
@@ -54,8 +62,8 @@ export default function Tasks() {
       setError('');
       await api.put(`/projects/${safeProjectId}/tasks/${task.id}`, { ...task, status });
       load();
-    } catch {
-      setError('Failed to update task status. Please try again.');
+    } catch (err) {
+      setError(extractError(err, 'Failed to update task status. Please try again.'));
     }
   };
 
@@ -66,8 +74,8 @@ export default function Tasks() {
       setError('');
       await api.delete(`/projects/${safeProjectId}/tasks/${id}`);
       load();
-    } catch {
-      setError('Failed to delete task. Please try again.');
+    } catch (err) {
+      setError(extractError(err, 'Failed to delete task. Please try again.'));
     }
   };
 

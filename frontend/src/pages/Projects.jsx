@@ -2,6 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/api';
 
+const extractError = (err, fallback) => {
+  const data = err.response?.data;
+  if (typeof data === 'string') return data;
+  if (data?.errors) return Object.values(data.errors).flat().join(' ');
+  if (data?.title) return data.title;
+  return fallback;
+};
+
 export default function Projects() {
   const [projects, setProjects] = useState([]);
   const [form, setForm] = useState({ name: '', description: '' });
@@ -15,8 +23,8 @@ export default function Projects() {
       setLoading(true);
       const { data } = await api.get('/projects');
       setProjects(data.items ?? data);
-    } catch {
-      setError('Failed to load projects. Please try again.');
+    } catch (err) {
+      setError(extractError(err, 'Failed to load projects. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -32,8 +40,8 @@ export default function Projects() {
       await api.post('/projects', form);
       setForm({ name: '', description: '' });
       load();
-    } catch {
-      setError('Failed to create project. Please try again.');
+    } catch (err) {
+      setError(extractError(err, 'Failed to create project. Please try again.'));
     } finally {
       setSubmitting(false);
     }
@@ -45,8 +53,8 @@ export default function Projects() {
       setError('');
       await api.delete(`/projects/${id}`);
       load();
-    } catch {
-      setError('Failed to delete project. Please try again.');
+    } catch (err) {
+      setError(extractError(err, 'Failed to delete project. Please try again.'));
     }
   };
 

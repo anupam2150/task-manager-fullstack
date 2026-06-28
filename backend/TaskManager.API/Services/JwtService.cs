@@ -6,12 +6,9 @@ using TaskManager.API.Models;
 
 namespace TaskManager.API.Services;
 
-public class JwtService(IConfiguration config)
+public class JwtService(IConfiguration config, string jwtKey)
 {
-    private readonly SymmetricSecurityKey _key = new(Encoding.UTF8.GetBytes(
-        Environment.GetEnvironmentVariable("JWT__Key")
-        ?? config["Jwt:Key"]
-        ?? throw new InvalidOperationException("JWT Key is not configured.")));
+    private readonly SymmetricSecurityKey _key = new(Encoding.UTF8.GetBytes(jwtKey));
 
     public string GenerateToken(User user)
     {
