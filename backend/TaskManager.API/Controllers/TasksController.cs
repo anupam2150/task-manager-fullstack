@@ -77,7 +77,6 @@ public class TasksController(AppDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Consumes("application/json")]
     public async Task<IActionResult> Delete(int projectId, int id)
     {
         if (!await ProjectBelongsToUser(projectId)) return Forbid();

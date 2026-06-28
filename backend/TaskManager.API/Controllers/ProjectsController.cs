@@ -62,7 +62,6 @@ public class ProjectsController(AppDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Consumes("application/json")]
     public async Task<IActionResult> Delete(int id)
     {
         var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id && p.OwnerId == UserId);

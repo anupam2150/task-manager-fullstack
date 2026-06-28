@@ -8,14 +8,14 @@ namespace TaskManager.API.Services;
 
 public class JwtService(IConfiguration config)
 {
+    private readonly SymmetricSecurityKey _key = new(Encoding.UTF8.GetBytes(
+        Environment.GetEnvironmentVariable("JWT__Key")
+        ?? config["Jwt:Key"]
+        ?? throw new InvalidOperationException("JWT Key is not configured.")));
+
     public string GenerateToken(User user)
     {
-        var jwtKey = Environment.GetEnvironmentVariable("JWT__Key")
-            ?? config["Jwt:Key"]
-            ?? throw new InvalidOperationException("JWT Key is not configured.");
-
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var creds = new SigningCredentials(_key, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]
         {

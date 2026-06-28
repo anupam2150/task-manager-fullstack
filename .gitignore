@@ -9,6 +9,7 @@ obj/
 *.log
 appsettings.Development.json
 dotnet-tools.json
+*.http
 
 # Frontend
 node_modules/
