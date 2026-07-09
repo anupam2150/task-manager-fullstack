@@ -783,3 +783,29 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 .status-chip.status-todo { background: #e0e7ff; color: #6366f1; }
 .status-chip.status-inprogress { background: #fef3c7; color: #d97706; }
 .status-chip.status-done { background: #d1fae5; color: #059669; }
+
+/* ── Share Button ── */
+.btn-share {
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-card);
+  color: #6366f1;
+  border: 1.5px solid #c7d2fe;
+  border-radius: 7px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-share:hover { background: #e0e7ff; border-color: #6366f1; }
+.btn-share:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-share-copy {
+  padding: 0.5rem 0.75rem;
+  background: #e0e7ff;
+  color: #6366f1;
+  border: 1.5px solid #6366f1;
+  border-radius: 7px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-share-copy:hover { background: #c7d2fe; }

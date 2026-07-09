@@ -29,7 +29,8 @@ public class ProjectsController(AppDbContext db) : ControllerBase
             .Select(p => new ProjectDto(
                 p.Id, p.Name, p.Description, p.CreatedAt, p.OwnerId,
                 p.Tasks.Count,
-                p.Tasks.Count(t => t.Status == Models.TaskStatus.Done)))
+                p.Tasks.Count(t => t.Status == Models.TaskStatus.Done),
+                p.ShareToken))
             .ToListAsync();
         return Ok(new PagedResult<ProjectDto>(items, total, page, pageSize));
     }
@@ -41,7 +42,7 @@ public class ProjectsController(AppDbContext db) : ControllerBase
         if (project is null) return NotFound();
         var taskCount = await db.Tasks.CountAsync(t => t.ProjectId == id);
         var completedCount = await db.Tasks.CountAsync(t => t.ProjectId == id && t.Status == Models.TaskStatus.Done);
-        return Ok(new ProjectDto(project.Id, project.Name, project.Description, project.CreatedAt, project.OwnerId, taskCount, completedCount));
+        return Ok(new ProjectDto(project.Id, project.Name, project.Description, project.CreatedAt, project.OwnerId, taskCount, completedCount, project.ShareToken));
     }
 
     [HttpPost]
@@ -66,7 +67,7 @@ public class ProjectsController(AppDbContext db) : ControllerBase
         await db.SaveChangesAsync();
         var taskCount = await db.Tasks.CountAsync(t => t.ProjectId == id);
         var completedCount = await db.Tasks.CountAsync(t => t.ProjectId == id && t.Status == Models.TaskStatus.Done);
-        return Ok(new ProjectDto(project.Id, project.Name, project.Description, project.CreatedAt, project.OwnerId, taskCount, completedCount));
+        return Ok(new ProjectDto(project.Id, project.Name, project.Description, project.CreatedAt, project.OwnerId, taskCount, completedCount, project.ShareToken));
     }
 
     [HttpDelete("{id}")]
@@ -76,6 +77,28 @@ public class ProjectsController(AppDbContext db) : ControllerBase
         var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id && p.OwnerId == UserId);
         if (project is null) return NotFound();
         db.Projects.Remove(project);
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpPost("{id}/share")]
+    [Consumes("application/json")]
+    public async Task<IActionResult> GenerateShareToken(int id)
+    {
+        var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id && p.OwnerId == UserId);
+        if (project is null) return NotFound();
+        project.ShareToken = Guid.NewGuid().ToString("N");
+        await db.SaveChangesAsync();
+        return Ok(new { shareToken = project.ShareToken });
+    }
+
+    [HttpDelete("{id}/share")]
+    [Consumes("application/json")]
+    public async Task<IActionResult> RevokeShareToken(int id)
+    {
+        var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id && p.OwnerId == UserId);
+        if (project is null) return NotFound();
+        project.ShareToken = null;
         await db.SaveChangesAsync();
         return NoContent();
     }

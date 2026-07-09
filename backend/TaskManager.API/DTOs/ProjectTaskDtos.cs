@@ -4,7 +4,7 @@ using TaskManager.API.Models;
 
 namespace TaskManager.API.DTOs;
 
-public record ProjectDto(int Id, string Name, string Description, DateTime CreatedAt, int OwnerId, int TaskCount = 0, int CompletedCount = 0);
+public record ProjectDto(int Id, string Name, string Description, DateTime CreatedAt, int OwnerId, int TaskCount = 0, int CompletedCount = 0, string? ShareToken = null);
 public record CreateProjectDto([Required, StringLength(100, MinimumLength = 1)] string Name, [StringLength(500)] string Description);
 public record UpdateProjectDto([Required, StringLength(100, MinimumLength = 1)] string Name, [StringLength(500)] string Description);
 

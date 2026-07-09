@@ -21,6 +21,7 @@ export default function Projects() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
+  const [sharingId, setSharingId] = useState(null);
   const navigate = useNavigate();
   const { push } = useNotif();
 
@@ -85,6 +86,30 @@ export default function Projects() {
     } catch (err) {
       push(extractError(err, 'Failed to delete label'), 'error');
     }
+  };
+
+  const handleShare = async (id) => {
+    try {
+      setSharingId(id);
+      await api.post(`/projects/${id}/share`);
+      push('Share link generated!', 'success');
+      load();
+    } catch { push('Failed to generate share link', 'error'); }
+    finally { setSharingId(null); }
+  };
+
+  const handleRevoke = async (id) => {
+    if (!window.confirm('Revoke share link? Anyone with the link will lose access.')) return;
+    try {
+      await api.delete(`/projects/${id}/share`);
+      push('Share link revoked', 'info');
+      load();
+    } catch { push('Failed to revoke share link', 'error'); }
+  };
+
+  const copyLink = (token) => {
+    navigator.clipboard.writeText(`${window.location.origin}/share/${token}`);
+    push('Link copied to clipboard!', 'success');
   };
 
   return (
@@ -163,6 +188,14 @@ export default function Projects() {
                 <span className="project-card-date">Created {new Date(p.createdAt).toLocaleDateString()}</span>
                 <div className="project-card-actions">
                   <button className="btn-view" onClick={() => navigate(`/projects/${p.id}`)}>View Tasks</button>
+                  {p.shareToken ? (
+                    <>
+                      <button className="btn-share-copy" onClick={() => copyLink(p.shareToken)} title="Copy share link">🔗</button>
+                      <button className="btn-delete" onClick={() => handleRevoke(p.id)} title="Revoke link">🔒</button>
+                    </>
+                  ) : (
+                    <button className="btn-share" onClick={() => handleShare(p.id)} disabled={sharingId === p.id} title="Generate share link">🔗</button>
+                  )}
                   <button className="btn-delete" onClick={() => handleDelete(p.id, p.name)}>🗑</button>
                 </div>
               </div>
