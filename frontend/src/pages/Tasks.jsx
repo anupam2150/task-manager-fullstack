@@ -10,11 +10,14 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import api from '../api/api';
 import { useNotif } from '../context/NotifContext';
+import TaskEditModal from '../components/TaskEditModal';
 
 const STATUSES = ['Todo', 'InProgress', 'Done'];
 const PRIORITIES = ['Low', 'Medium', 'High'];
 const COL_CLASS = { Todo: 'todo', InProgress: 'inprogress', Done: 'done' };
 const COL_LABEL = { Todo: 'To Do', InProgress: 'In Progress', Done: 'Done' };
+const TABS = ['details', 'subtasks', 'deps', 'activity', 'comments'];
+const TAB_LABEL = { details: 'Labels', subtasks: 'Subtasks', deps: 'Blockers', activity: 'Activity', comments: 'Comments' };
 
 const extractError = (err, fallback) => {
   const data = err.response?.data;
@@ -34,9 +37,10 @@ const getDueBadge = (dueDate, status) => {
   return null;
 };
 
-function TaskCardInner({ task, projectId, onRefresh, labels, allTasks, isDragging }) {
+function TaskCardInner({ task, projectId, onRefresh, labels, allTasks, isDragging, onEdit }) {
   const { push } = useNotif();
   const [expanded, setExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState('details');
   const [comment, setComment] = useState('');
   const [subtaskTitle, setSubtaskTitle] = useState('');
   const [timerRunning, setTimerRunning] = useState(false);
@@ -247,106 +251,113 @@ function TaskCardInner({ task, projectId, onRefresh, labels, allTasks, isDraggin
         <button className="btn-icon" onClick={() => setExpanded(e => !e)} title="Details">
           {expanded ? '▲ Hide' : '▼ Details'}
         </button>
+        <button className="btn-icon" onClick={() => onEdit(task)} title="Edit task">✏️</button>
         <button className="btn-archive" onClick={handleArchive} title="Archive task">📦</button>
         <button className="btn-delete" onClick={handleDelete}>🗑</button>
       </div>
 
       {expanded && (
         <div className="task-expanded">
-          {labels.length > 0 && (
-            <div className="expanded-section">
-              <h4>Add Labels</h4>
-              <div className="label-options">
-                {labels.filter(l => !task.labels?.find(tl => tl.id === l.id)).map(l => (
-                  <span key={l.id} className="label-chip label-chip-add"
-                    style={{ background: l.color + '22', color: l.color, border: `1px solid ${l.color}`, cursor: 'pointer' }}
-                    onClick={() => handleAddLabel(l.id)}>
-                    + {l.name}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="expanded-section">
-            <h4>🔗 Blocked By</h4>
-            {task.blockedByIds?.length > 0 ? (
-              task.blockedByIds.map(bid => {
-                const blocker = allTasks?.find(t => t.id === bid);
-                const done = blocker?.status === 'Done';
-                return (
-                  <div key={bid} className="dep-item">
-                    <span className={`dep-title ${done ? 'dep-done' : 'dep-pending'}`}>
-                      {done ? '✅' : '⏳'} {blocker ? blocker.title : `Task #${bid}`}
-                    </span>
-                    <button className="btn-icon-sm" onClick={() => handleRemoveDep(bid)}>✕</button>
+          <div className="tc-tabs">
+            {TABS.map(t => (
+              <button key={t} className={`tc-tab${activeTab === t ? ' tc-tab--active' : ''}`} onClick={() => setActiveTab(t)}>
+                {TAB_LABEL[t]}
+                {t === 'comments' && task.comments?.length > 0 && <span className="tc-tab-count">{task.comments.length}</span>}
+                {t === 'subtasks' && totalSubs > 0 && <span className="tc-tab-count">{completedSubs}/{totalSubs}</span>}
+              </button>
+            ))}
+          </div>
+          <div className="tc-tab-body">
+            {activeTab === 'details' && (
+              <div className="expanded-section">
+                {labels.filter(l => !task.labels?.find(tl => tl.id === l.id)).length > 0 ? (
+                  <div className="label-options">
+                    {labels.filter(l => !task.labels?.find(tl => tl.id === l.id)).map(l => (
+                      <span key={l.id} className="label-chip label-chip-add"
+                        style={{ background: l.color + '22', color: l.color, border: `1px solid ${l.color}`, cursor: 'pointer' }}
+                        onClick={() => handleAddLabel(l.id)}>+ {l.name}</span>
+                    ))}
                   </div>
-                );
-              })
-            ) : <p className="dep-empty">No blockers</p>}
-            <form onSubmit={handleAddDep} className="mini-form">
-              <select value={depTaskId} onChange={e => setDepTaskId(e.target.value)}>
-                <option value="">Add blocker...</option>
-                {allTasks?.filter(t => t.id !== task.id && !task.blockedByIds?.includes(t.id)).map(t => (
-                  <option key={t.id} value={t.id}>#{t.id} {t.title}</option>
-                ))}
-              </select>
-              <button type="submit" className="btn-mini" disabled={!depTaskId}>Add</button>
-            </form>
-          </div>
-
-          <div className="expanded-section">
-            <h4>Subtasks</h4>
-            {task.subTasks?.map(s => (
-              <div key={s.id} className="subtask-item">
-                <input type="checkbox" checked={s.isCompleted} onChange={() => handleToggleSubtask(s)} />
-                <span style={{ textDecoration: s.isCompleted ? 'line-through' : 'none', color: s.isCompleted ? '#94a3b8' : 'inherit' }}>
-                  {s.title}
-                </span>
-                <button className="btn-icon-sm" onClick={() => handleDeleteSubtask(s.id)}>✕</button>
+                ) : <p className="dep-empty">All labels assigned</p>}
               </div>
-            ))}
-            <form onSubmit={handleAddSubtask} className="mini-form">
-              <input placeholder="Add subtask..." value={subtaskTitle}
-                onChange={e => setSubtaskTitle(e.target.value)} />
-              <button type="submit" className="btn-mini">Add</button>
-            </form>
-          </div>
-
-          {task.activityLogs?.length > 0 && (
-            <div className="expanded-section">
-              <h4>Activity</h4>
-              <ul className="activity-log">
-                {task.activityLogs.map(a => (
-                  <li key={a.id} className="activity-item">
-                    <span className="activity-dot" />
-                    <div className="activity-body">
-                      <span className="activity-action">{a.action}</span>
-                      <span className="activity-meta">{a.username} · {new Date(a.createdAt).toLocaleString()}</span>
+            )}
+            {activeTab === 'subtasks' && (
+              <div className="expanded-section">
+                {task.subTasks?.map(s => (
+                  <div key={s.id} className="subtask-item">
+                    <input type="checkbox" checked={s.isCompleted} onChange={() => handleToggleSubtask(s)} />
+                    <span className={s.isCompleted ? 'subtask-done' : ''}>{s.title}</span>
+                    <button className="btn-icon-sm" onClick={() => handleDeleteSubtask(s.id)}>✕</button>
+                  </div>
+                ))}
+                <form onSubmit={handleAddSubtask} className="mini-form">
+                  <input placeholder="Add subtask..." value={subtaskTitle} onChange={e => setSubtaskTitle(e.target.value)} />
+                  <button type="submit" className="btn-mini">Add</button>
+                </form>
+              </div>
+            )}
+            {activeTab === 'deps' && (
+              <div className="expanded-section">
+                {task.blockedByIds?.length > 0 ? (
+                  task.blockedByIds.map(bid => {
+                    const blocker = allTasks?.find(t => t.id === bid);
+                    const done = blocker?.status === 'Done';
+                    return (
+                      <div key={bid} className="dep-item">
+                        <span className={`dep-title ${done ? 'dep-done' : 'dep-pending'}`}>
+                          {done ? '✅' : '⏳'} {blocker ? blocker.title : `Task #${bid}`}
+                        </span>
+                        <button className="btn-icon-sm" onClick={() => handleRemoveDep(bid)}>✕</button>
+                      </div>
+                    );
+                  })
+                ) : <p className="dep-empty">No blockers</p>}
+                <form onSubmit={handleAddDep} className="mini-form">
+                  <select value={depTaskId} onChange={e => setDepTaskId(e.target.value)}>
+                    <option value="">Add blocker...</option>
+                    {allTasks?.filter(t => t.id !== task.id && !task.blockedByIds?.includes(t.id)).map(t => (
+                      <option key={t.id} value={t.id}>#{t.id} {t.title}</option>
+                    ))}
+                  </select>
+                  <button type="submit" className="btn-mini" disabled={!depTaskId}>Add</button>
+                </form>
+              </div>
+            )}
+            {activeTab === 'activity' && (
+              <div className="expanded-section">
+                {task.activityLogs?.length > 0 ? (
+                  <ul className="activity-log">
+                    {task.activityLogs.map(a => (
+                      <li key={a.id} className="activity-item">
+                        <span className="activity-dot" />
+                        <div className="activity-body">
+                          <span className="activity-action">{a.action}</span>
+                          <span className="activity-meta">{a.username} · {new Date(a.createdAt).toLocaleString()}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p className="dep-empty">No activity yet</p>}
+              </div>
+            )}
+            {activeTab === 'comments' && (
+              <div className="expanded-section">
+                {task.comments?.map(c => (
+                  <div key={c.id} className="comment-item">
+                    <div className="comment-header">
+                      <strong>{c.authorUsername}</strong>
+                      <small>{new Date(c.createdAt).toLocaleString()}</small>
+                      <button className="btn-icon-sm" onClick={() => handleDeleteComment(c.id)}>✕</button>
                     </div>
-                  </li>
+                    <p>{c.content}</p>
+                  </div>
                 ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="expanded-section">
-            <h4>Comments</h4>
-            {task.comments?.map(c => (
-              <div key={c.id} className="comment-item">
-                <div className="comment-header">
-                  <strong>{c.authorUsername}</strong>
-                  <small>{new Date(c.createdAt).toLocaleString()}</small>
-                  <button className="btn-icon-sm" onClick={() => handleDeleteComment(c.id)}>✕</button>
-                </div>
-                <p>{c.content}</p>
+                <form onSubmit={handleAddComment} className="mini-form">
+                  <input placeholder="Add a comment..." value={comment} onChange={e => setComment(e.target.value)} />
+                  <button type="submit" className="btn-mini">Post</button>
+                </form>
               </div>
-            ))}
-            <form onSubmit={handleAddComment} className="mini-form">
-              <input placeholder="Add a comment..." value={comment}
-                onChange={e => setComment(e.target.value)} />
-              <button type="submit" className="btn-mini">Post</button>
-            </form>
+            )}
           </div>
         </div>
       )}
@@ -354,7 +365,7 @@ function TaskCardInner({ task, projectId, onRefresh, labels, allTasks, isDraggin
   );
 }
 
-function SortableTaskCard({ task, projectId, onRefresh, labels, allTasks }) {
+function SortableTaskCard({ task, projectId, onRefresh, labels, allTasks, onEdit }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `task-${task.id}`,
     data: { type: 'task', task }
@@ -369,13 +380,13 @@ function SortableTaskCard({ task, projectId, onRefresh, labels, allTasks }) {
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
       <div {...listeners} style={{ cursor: 'grab', touchAction: 'none' }}>
-        <TaskCardInner task={task} projectId={projectId} onRefresh={onRefresh} labels={labels} allTasks={allTasks} isDragging={isDragging} />
+        <TaskCardInner task={task} projectId={projectId} onRefresh={onRefresh} labels={labels} allTasks={allTasks} isDragging={isDragging} onEdit={onEdit} />
       </div>
     </div>
   );
 }
 
-function DroppableColumn({ status, tasks, projectId, onRefresh, labels, allTasks }) {
+function DroppableColumn({ status, tasks, projectId, onRefresh, labels, allTasks, onEdit }) {
   return (
     <div className={`kanban-col ${COL_CLASS[status]}`}>
       <div className="kanban-col-header">
@@ -387,7 +398,7 @@ function DroppableColumn({ status, tasks, projectId, onRefresh, labels, allTasks
           <div className="empty-col-drop">Drop tasks here</div>
         ) : (
           tasks.map(task => (
-            <SortableTaskCard key={task.id} task={task} projectId={projectId} onRefresh={onRefresh} labels={labels} allTasks={allTasks} />
+            <SortableTaskCard key={task.id} task={task} projectId={projectId} onRefresh={onRefresh} labels={labels} allTasks={allTasks} onEdit={onEdit} />
           ))
         )}
       </SortableContext>
@@ -411,6 +422,8 @@ export default function Tasks() {
   const [activeTask, setActiveTask] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
   const [archivedTasks, setArchivedTasks] = useState([]);
+  const [editingTask, setEditingTask] = useState(null);
+  const formRef = useRef(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -473,6 +486,16 @@ export default function Tasks() {
   };
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'n' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        formRef.current?.querySelector('input')?.focus();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -563,41 +586,42 @@ export default function Tasks() {
 
   return (
     <div className="page">
-      <div className="page-header">
-        <button className="back-btn" onClick={() => navigate('/')}>← Back</button>
-        <h2>Tasks</h2>
-        {overdueCount > 0 && (
-          <span className="overdue-banner">🚨 {overdueCount} overdue task{overdueCount !== 1 ? 's' : ''}</span>
-        )}
-        <button className="btn-outline" style={{ marginLeft: 'auto' }} onClick={() => {
-          setShowArchived(s => !s);
-          if (!showArchived) loadArchived();
-        }}>
-          📦 {showArchived ? 'Hide Archived' : 'View Archived'}
-        </button>
-        <button className="btn-outline btn-export" onClick={handleExport}>
-          ⬇️ Export CSV
-        </button>
+      <div className="tasks-page-header">
+        <div className="tasks-page-header-left">
+          <button className="back-btn" onClick={() => navigate('/')}>← Back</button>
+          <div>
+            <h2>Tasks</h2>
+            {overdueCount > 0 && (
+              <span className="overdue-banner">🚨 {overdueCount} overdue</span>
+            )}
+          </div>
+        </div>
+        <div className="tasks-page-header-right">
+          <button className="btn-outline" onClick={() => { setShowArchived(s => !s); if (!showArchived) loadArchived(); }}>
+            📦 {showArchived ? 'Hide Archived' : 'Archived'}
+          </button>
+          <button className="btn-outline btn-export" onClick={handleExport}>⬇️ Export CSV</button>
+        </div>
       </div>
 
-      <form onSubmit={handleCreate} className="add-form">
-        <input placeholder="Task title" value={form.title}
-          onChange={e => setForm({ ...form, title: e.target.value })} required />
-        <input placeholder="Description" value={form.description}
-          onChange={e => setForm({ ...form, description: e.target.value })} />
-        <select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}>
-          {PRIORITIES.map(p => <option key={p}>{p}</option>)}
-        </select>
-        <input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} />
-        <select value={form.recurrence} onChange={e => setForm({ ...form, recurrence: e.target.value })}>
-          <option value="None">No Repeat</option>
-          <option value="Daily">Daily</option>
-          <option value="Weekly">Weekly</option>
-          <option value="Monthly">Monthly</option>
-        </select>
-        <button type="submit" className="btn-add" disabled={submitting}>
-          {submitting ? 'Adding...' : '+ Add Task'}
-        </button>
+      <form ref={formRef} onSubmit={handleCreate} className="add-form">
+        <div className="add-form-row">
+          <input placeholder="Task title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required />
+          <input placeholder="Description (optional)" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+        </div>
+        <div className="add-form-row">
+          <select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}>
+            {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+          </select>
+          <input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} />
+          <select value={form.recurrence} onChange={e => setForm({ ...form, recurrence: e.target.value })}>
+            <option value="None">No Repeat</option>
+            <option value="Daily">Daily</option>
+            <option value="Weekly">Weekly</option>
+            <option value="Monthly">Monthly</option>
+          </select>
+          <button type="submit" className="btn-add" disabled={submitting}>{submitting ? 'Adding...' : '+ Add Task'}</button>
+        </div>
       </form>
 
       <div className="filter-bar">
@@ -637,6 +661,7 @@ export default function Tasks() {
                 onRefresh={load}
                 labels={labels}
                 allTasks={tasks}
+                onEdit={setEditingTask}
               />
             ))}
           </div>
@@ -646,6 +671,16 @@ export default function Tasks() {
             )}
           </DragOverlay>
         </DndContext>
+      )}
+
+      {editingTask && (
+        <TaskEditModal
+          task={editingTask}
+          projectId={safeProjectId}
+          onClose={() => setEditingTask(null)}
+          onSaved={load}
+          push={push}
+        />
       )}
 
       {showArchived && (

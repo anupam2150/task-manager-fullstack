@@ -30,7 +30,8 @@ public class ProjectsController(AppDbContext db) : ControllerBase
                 p.Id, p.Name, p.Description, p.CreatedAt, p.OwnerId,
                 p.Tasks.Count,
                 p.Tasks.Count(t => t.Status == Models.TaskStatus.Done),
-                p.ShareToken))
+                p.ShareToken,
+                p.Tasks.Count(t => t.Status == Models.TaskStatus.InProgress)))
             .ToListAsync();
         return Ok(new PagedResult<ProjectDto>(items, total, page, pageSize));
     }
@@ -42,7 +43,8 @@ public class ProjectsController(AppDbContext db) : ControllerBase
         if (project is null) return NotFound();
         var taskCount = await db.Tasks.CountAsync(t => t.ProjectId == id);
         var completedCount = await db.Tasks.CountAsync(t => t.ProjectId == id && t.Status == Models.TaskStatus.Done);
-        return Ok(new ProjectDto(project.Id, project.Name, project.Description, project.CreatedAt, project.OwnerId, taskCount, completedCount, project.ShareToken));
+        var inProgressCount = await db.Tasks.CountAsync(t => t.ProjectId == id && t.Status == Models.TaskStatus.InProgress);
+        return Ok(new ProjectDto(project.Id, project.Name, project.Description, project.CreatedAt, project.OwnerId, taskCount, completedCount, project.ShareToken, inProgressCount));
     }
 
     [HttpPost]
@@ -67,7 +69,8 @@ public class ProjectsController(AppDbContext db) : ControllerBase
         await db.SaveChangesAsync();
         var taskCount = await db.Tasks.CountAsync(t => t.ProjectId == id);
         var completedCount = await db.Tasks.CountAsync(t => t.ProjectId == id && t.Status == Models.TaskStatus.Done);
-        return Ok(new ProjectDto(project.Id, project.Name, project.Description, project.CreatedAt, project.OwnerId, taskCount, completedCount, project.ShareToken));
+        var inProgressCount = await db.Tasks.CountAsync(t => t.ProjectId == id && t.Status == Models.TaskStatus.InProgress);
+        return Ok(new ProjectDto(project.Id, project.Name, project.Description, project.CreatedAt, project.OwnerId, taskCount, completedCount, project.ShareToken, inProgressCount));
     }
 
     [HttpDelete("{id}")]

@@ -12,15 +12,64 @@ const extractError = (err, fallback) => {
 };
 
 const LABEL_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#0ea5e9','#f97316','#ec4899'];
+const CARD_ACCENTS = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#0ea5e9','#f97316','#ec4899'];
+
+function NewProjectModal({ onClose, onCreated, push }) {
+  const [form, setForm] = useState({ name: '', description: '' });
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setSubmitting(true);
+      await api.post('/projects', form);
+      push('Project created!', 'success');
+      onCreated();
+      onClose();
+    } catch (err) {
+      push(extractError(err, 'Failed to create project'), 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>New Project</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <form onSubmit={handleSubmit} className="modal-form">
+          <label>
+            Project Name
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required autoFocus placeholder="e.g. Website Redesign" />
+          </label>
+          <label>
+            Description
+            <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3} placeholder="What is this project about?" />
+          </label>
+          <div className="modal-footer">
+            <button type="button" className="btn-outline" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={submitting}>{submitting ? 'Creating…' : 'Create Project'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function SkeletonCard() {
+  return <div className="proj-skeleton" />;
+}
 
 export default function Projects() {
   const [projects, setProjects] = useState([]);
   const [labels, setLabels] = useState([]);
-  const [form, setForm] = useState({ name: '', description: '' });
   const [labelForm, setLabelForm] = useState({ name: '', color: '#6366f1' });
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
+  const [showNewModal, setShowNewModal] = useState(false);
   const [sharingId, setSharingId] = useState(null);
   const navigate = useNavigate();
   const { push } = useNotif();
@@ -39,21 +88,6 @@ export default function Projects() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    try {
-      setSubmitting(true);
-      await api.post('/projects', form);
-      setForm({ name: '', description: '' });
-      push('Project created!', 'success');
-      load();
-    } catch (err) {
-      push(extractError(err, 'Failed to create project'), 'error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleDelete = async (id, name) => {
     if (!window.confirm(`Delete "${name}"? This will also delete all its tasks.`)) return;
@@ -113,95 +147,132 @@ export default function Projects() {
   };
 
   return (
-    <div className="page">
-      <div className="page-header">
-        <h2>My Projects</h2>
-        <button className="btn-outline" onClick={() => setShowLabels(s => !s)}>
-          🏷️ {showLabels ? 'Hide Labels' : 'Manage Labels'}
-        </button>
+    <div className="page proj-page">
+      <div className="proj-hero">
+        <div className="proj-hero-text">
+          <h1 className="proj-hero-title">My Projects</h1>
+          <p className="proj-hero-sub">{loading ? '…' : `${projects.length} project${projects.length !== 1 ? 's' : ''}`}</p>
+        </div>
+        <div className="proj-hero-actions">
+          <button className="btn-outline proj-labels-btn" onClick={() => setShowLabels(s => !s)}>
+            🏷️ Labels
+            {labels.length > 0 && <span className="proj-labels-count">{labels.length}</span>}
+          </button>
+          <button className="btn-primary proj-new-btn" onClick={() => setShowNewModal(true)}>+ New Project</button>
+        </div>
       </div>
 
       {showLabels && (
-        <div className="labels-panel">
-          <h3>Labels</h3>
-          <div className="labels-list">
-            {labels.map(l => (
-              <span key={l.id} className="label-chip"
-                style={{ background: l.color + '22', color: l.color, border: `1px solid ${l.color}` }}>
-                {l.name}
-                <button onClick={() => handleDeleteLabel(l.id)}>✕</button>
-              </span>
-            ))}
+        <div className="proj-labels-drawer">
+          <div className="proj-labels-drawer-header">
+            <span className="proj-labels-drawer-title">Labels</span>
+            <button className="modal-close" onClick={() => setShowLabels(false)}>✕</button>
           </div>
-          <form onSubmit={handleCreateLabel} className="add-form" style={{ marginTop: '0.75rem' }}>
+          <div className="proj-labels-chips">
+            {labels.length === 0
+              ? <span className="proj-labels-empty">No labels yet</span>
+              : labels.map(l => (
+                <span key={l.id} className="label-chip"
+                  style={{ background: l.color + '22', color: l.color, border: `1px solid ${l.color}` }}>
+                  {l.name}
+                  <button onClick={() => handleDeleteLabel(l.id)}>✕</button>
+                </span>
+              ))}
+          </div>
+          <form onSubmit={handleCreateLabel} className="proj-labels-form">
             <input placeholder="Label name" value={labelForm.name}
               onChange={e => setLabelForm({ ...labelForm, name: e.target.value })} required />
             <div className="color-options">
               {LABEL_COLORS.map(c => (
-                <div key={c} className={`color-dot ${labelForm.color === c ? 'selected' : ''}`}
+                <div key={c} className={`color-dot${labelForm.color === c ? ' selected' : ''}`}
                   style={{ background: c }} onClick={() => setLabelForm({ ...labelForm, color: c })} />
               ))}
             </div>
-            <button type="submit" className="btn-add">+ Add Label</button>
+            <button type="submit" className="btn-add">+ Add</button>
           </form>
         </div>
       )}
 
-      <form onSubmit={handleCreate} className="add-form">
-        <input placeholder="Project name" value={form.name}
-          onChange={e => setForm({ ...form, name: e.target.value })} required />
-        <input placeholder="Description (optional)" value={form.description}
-          onChange={e => setForm({ ...form, description: e.target.value })} />
-        <button type="submit" className="btn-add" disabled={submitting}>
-          {submitting ? 'Creating...' : '+ New Project'}
-        </button>
-      </form>
-
       {loading ? (
-        <p className="loading">Loading projects...</p>
+        <div className="projects-grid">
+          {[1,2,3].map(i => <SkeletonCard key={i} />)}
+        </div>
       ) : projects.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">📋</div>
+        <div className="proj-empty">
+          <div className="proj-empty-icon">📋</div>
           <h3>No projects yet</h3>
-          <p>Create your first project using the form above!</p>
+          <p>Create your first project to get started</p>
+          <button className="btn-primary" onClick={() => setShowNewModal(true)}>+ New Project</button>
         </div>
       ) : (
         <>
           <p className="section-title">{projects.length} Project{projects.length !== 1 ? 's' : ''}</p>
           <div className="projects-grid">
-            {projects.map(p => (
-              <div key={p.id} className="project-card">
-                <div className="project-card-icon">📁</div>
-                <h3>{p.name}</h3>
-                <p>{p.description || 'No description provided.'}</p>
-                <div className="project-progress">
-                  <div className="project-progress-bar">
-                    <div
-                      className="project-progress-fill"
-                      style={{ width: `${p.taskCount > 0 ? Math.round((p.completedCount / p.taskCount) * 100) : 0}%` }}
-                    />
+            {projects.map((p, i) => {
+              const accent = CARD_ACCENTS[i % CARD_ACCENTS.length];
+              const pct = p.taskCount > 0 ? Math.round((p.completedCount / p.taskCount) * 100) : 0;
+              const inProgress = (p.taskCount ?? 0) - (p.completedCount ?? 0) - ((p.taskCount ?? 0) - (p.completedCount ?? 0) - (p.inProgressCount ?? 0));
+              return (
+                <div key={p.id} className="proj-card">
+                  <div className="proj-card-accent" style={{ background: accent }} />
+                  <div className="proj-card-body">
+                    <div className="proj-card-top">
+                      <div className="proj-card-icon" style={{ background: accent + '22', color: accent }}>📁</div>
+                      <div className="proj-card-title-wrap">
+                        <h3 className="proj-card-name">{p.name}</h3>
+                        <span className="proj-card-date">Created {new Date(p.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                    {p.description && <p className="proj-card-desc">{p.description}</p>}
+                    <div className="proj-card-stats">
+                      <div className="proj-stat">
+                        <span className="proj-stat-value">{p.taskCount ?? 0}</span>
+                        <span className="proj-stat-label">Total</span>
+                      </div>
+                      <div className="proj-stat">
+                        <span className="proj-stat-value proj-stat-value--done">{p.completedCount ?? 0}</span>
+                        <span className="proj-stat-label">Done</span>
+                      </div>
+                      <div className="proj-stat">
+                        <span className="proj-stat-value proj-stat-value--prog">{p.inProgressCount ?? 0}</span>
+                        <span className="proj-stat-label">Active</span>
+                      </div>
+                      <div className="proj-stat">
+                        <span className="proj-stat-value proj-stat-value--pct">{pct}%</span>
+                        <span className="proj-stat-label">Done</span>
+                      </div>
+                    </div>
+                    <div className="proj-card-progress-bar">
+                      <div className="proj-card-progress-fill" style={{ width: `${pct}%`, background: accent }} />
+                    </div>
+                    <div className="proj-card-footer">
+                      <button className="proj-btn-view" onClick={() => navigate(`/projects/${p.id}`)}>View Tasks</button>
+                      <div className="proj-card-secondary">
+                        {p.shareToken ? (
+                          <>
+                            <button className="proj-icon-btn proj-icon-btn--share" onClick={() => copyLink(p.shareToken)} title="Copy share link">🔗</button>
+                            <button className="proj-icon-btn proj-icon-btn--lock" onClick={() => handleRevoke(p.id)} title="Revoke link">🔒</button>
+                          </>
+                        ) : (
+                          <button className="proj-icon-btn proj-icon-btn--share" onClick={() => handleShare(p.id)} disabled={sharingId === p.id} title="Generate share link">🔗</button>
+                        )}
+                        <button className="proj-icon-btn proj-icon-btn--del" onClick={() => handleDelete(p.id, p.name)} title="Delete project">🗑</button>
+                      </div>
+                    </div>
                   </div>
-                  <small className="project-progress-label">
-                    {p.taskCount === 0 ? 'No tasks yet' : `${p.completedCount}/${p.taskCount} done · ${Math.round((p.completedCount / p.taskCount) * 100)}%`}
-                  </small>
                 </div>
-                <span className="project-card-date">Created {new Date(p.createdAt).toLocaleDateString()}</span>
-                <div className="project-card-actions">
-                  <button className="btn-view" onClick={() => navigate(`/projects/${p.id}`)}>View Tasks</button>
-                  {p.shareToken ? (
-                    <>
-                      <button className="btn-share-copy" onClick={() => copyLink(p.shareToken)} title="Copy share link">🔗</button>
-                      <button className="btn-delete" onClick={() => handleRevoke(p.id)} title="Revoke link">🔒</button>
-                    </>
-                  ) : (
-                    <button className="btn-share" onClick={() => handleShare(p.id)} disabled={sharingId === p.id} title="Generate share link">🔗</button>
-                  )}
-                  <button className="btn-delete" onClick={() => handleDelete(p.id, p.name)}>🗑</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
+      )}
+
+      {showNewModal && (
+        <NewProjectModal
+          onClose={() => setShowNewModal(false)}
+          onCreated={load}
+          push={push}
+        />
       )}
     </div>
   );
