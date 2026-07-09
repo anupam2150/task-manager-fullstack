@@ -16,4 +16,8 @@ public class TaskItem
     public Project Project { get; set; } = null!;
     public int? AssignedToId { get; set; }
     public User? AssignedTo { get; set; }
+    public ICollection<Comment> Comments { get; set; } = [];
+    public ICollection<SubTask> SubTasks { get; set; } = [];
+    public ICollection<TaskLabel> TaskLabels { get; set; } = [];
+    public ICollection<ActivityLog> ActivityLogs { get; set; } = [];
 }

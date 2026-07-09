@@ -9,4 +9,7 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public ICollection<Project> Projects { get; set; } = [];
     public ICollection<TaskItem> AssignedTasks { get; set; } = [];
+    public ICollection<Comment> Comments { get; set; } = [];
+    public ICollection<Label> Labels { get; set; } = [];
+    public ICollection<ActivityLog> ActivityLogs { get; set; } = [];
 }

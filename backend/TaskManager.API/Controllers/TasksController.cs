@@ -20,7 +20,9 @@ public class TasksController(AppDbContext db) : ControllerBase
         t.DueDate, t.CreatedAt, t.ProjectId, t.AssignedToId,
         t.TaskLabels.Select(tl => new LabelDto(tl.Label.Id, tl.Label.Name, tl.Label.Color)).ToList(),
         t.SubTasks.Select(s => new SubTaskDto(s.Id, s.Title, s.IsCompleted)).ToList(),
-        t.Comments.Select(c => new CommentDto(c.Id, c.Content, c.CreatedAt, c.Author.Username)).ToList()
+        t.Comments.Select(c => new CommentDto(c.Id, c.Content, c.CreatedAt, c.Author.Username)).ToList(),
+        t.ActivityLogs.OrderByDescending(a => a.CreatedAt)
+            .Select(a => new ActivityLogDto(a.Id, a.Action, a.CreatedAt, a.User.Username)).ToList()
     );
 
     private async Task<bool> ProjectBelongsToUser(int projectId) =>
@@ -31,7 +33,14 @@ public class TasksController(AppDbContext db) : ControllerBase
             .Where(t => t.ProjectId == projectId)
             .Include(t => t.TaskLabels).ThenInclude(tl => tl.Label)
             .Include(t => t.SubTasks)
-            .Include(t => t.Comments).ThenInclude(c => c.Author);
+            .Include(t => t.Comments).ThenInclude(c => c.Author)
+            .Include(t => t.ActivityLogs).ThenInclude(a => a.User);
+
+    private async Task Log(int taskId, string action)
+    {
+        db.ActivityLogs.Add(new ActivityLog { TaskId = taskId, UserId = UserId, Action = action });
+        await db.SaveChangesAsync();
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetAll(int projectId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
@@ -67,6 +76,7 @@ public class TasksController(AppDbContext db) : ControllerBase
         };
         db.Tasks.Add(task);
         await db.SaveChangesAsync();
+        await Log(task.Id, "Task created");
         var created = await TasksWithIncludes(projectId).FirstAsync(t => t.Id == task.Id);
         return CreatedAtAction(nameof(Get), new { projectId, id = task.Id }, ToDto(created));
     }
@@ -78,10 +88,21 @@ public class TasksController(AppDbContext db) : ControllerBase
         if (!await ProjectBelongsToUser(projectId)) return Forbid();
         var task = await db.Tasks.FirstOrDefaultAsync(t => t.Id == id && t.ProjectId == projectId);
         if (task is null) return NotFound();
+
+        var changes = new List<string>();
+        if (task.Status != dto.Status) changes.Add($"Status changed to {dto.Status}");
+        if (task.Priority != dto.Priority) changes.Add($"Priority changed to {dto.Priority}");
+        if (task.Title != dto.Title) changes.Add($"Title updated");
+        if (task.DueDate != dto.DueDate) changes.Add($"Due date updated");
+
         task.Title = dto.Title; task.Description = dto.Description;
         task.Status = dto.Status; task.Priority = dto.Priority;
         task.DueDate = dto.DueDate; task.AssignedToId = dto.AssignedToId;
         await db.SaveChangesAsync();
+
+        foreach (var change in changes)
+            await Log(id, change);
+
         var updated = await TasksWithIncludes(projectId).FirstAsync(t => t.Id == id);
         return Ok(ToDto(updated));
     }
@@ -105,8 +126,10 @@ public class TasksController(AppDbContext db) : ControllerBase
     {
         if (!await ProjectBelongsToUser(projectId)) return Forbid();
         if (await db.TaskLabels.AnyAsync(tl => tl.TaskId == id && tl.LabelId == labelId)) return Ok();
+        var label = await db.Labels.FindAsync(labelId);
         db.TaskLabels.Add(new TaskLabel { TaskId = id, LabelId = labelId });
         await db.SaveChangesAsync();
+        await Log(id, $"Label \"{label?.Name ?? labelId.ToString()}\" added");
         return Ok();
     }
 
@@ -117,8 +140,10 @@ public class TasksController(AppDbContext db) : ControllerBase
         if (!await ProjectBelongsToUser(projectId)) return Forbid();
         var tl = await db.TaskLabels.FirstOrDefaultAsync(tl => tl.TaskId == id && tl.LabelId == labelId);
         if (tl is null) return NotFound();
+        var label = await db.Labels.FindAsync(labelId);
         db.TaskLabels.Remove(tl);
         await db.SaveChangesAsync();
+        await Log(id, $"Label \"{label?.Name ?? labelId.ToString()}\" removed");
         return NoContent();
     }
 
@@ -140,6 +165,7 @@ public class TasksController(AppDbContext db) : ControllerBase
         var subtask = new SubTask { Title = dto.Title, TaskId = id };
         db.SubTasks.Add(subtask);
         await db.SaveChangesAsync();
+        await Log(id, $"Subtask \"{dto.Title}\" added");
         return Ok(new SubTaskDto(subtask.Id, subtask.Title, subtask.IsCompleted));
     }
 
@@ -150,9 +176,12 @@ public class TasksController(AppDbContext db) : ControllerBase
         if (!await ProjectBelongsToUser(projectId)) return Forbid();
         var subtask = await db.SubTasks.FirstOrDefaultAsync(s => s.Id == subId && s.TaskId == id);
         if (subtask is null) return NotFound();
+        var wasCompleted = subtask.IsCompleted;
         subtask.Title = dto.Title;
         subtask.IsCompleted = dto.IsCompleted;
         await db.SaveChangesAsync();
+        if (wasCompleted != dto.IsCompleted)
+            await Log(id, $"Subtask \"{dto.Title}\" marked {(dto.IsCompleted ? "complete" : "incomplete")}");
         return Ok(new SubTaskDto(subtask.Id, subtask.Title, subtask.IsCompleted));
     }
 
@@ -189,6 +218,7 @@ public class TasksController(AppDbContext db) : ControllerBase
         var comment = new Comment { Content = dto.Content, TaskId = id, AuthorId = UserId };
         db.Comments.Add(comment);
         await db.SaveChangesAsync();
+        await Log(id, "Comment added");
         await db.Entry(comment).Reference(c => c.Author).LoadAsync();
         return Ok(new CommentDto(comment.Id, comment.Content, comment.CreatedAt, comment.Author.Username));
     }

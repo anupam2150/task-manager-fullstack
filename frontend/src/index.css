@@ -454,3 +454,45 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
   border-color: #6366f1;
   color: #6366f1;
 }
+
+/* ── Activity Log ── */
+.activity-log {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0;
+  margin: 0;
+}
+
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.activity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6366f1;
+  margin-top: 0.3rem;
+  flex-shrink: 0;
+}
+
+.activity-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.activity-action {
+  font-size: 0.8rem;
+  color: #334155;
+  font-weight: 500;
+}
+
+.activity-meta {
+  font-size: 0.72rem;
+  color: #94a3b8;
+}

@@ -200,6 +200,23 @@ function TaskCardInner({ task, projectId, onRefresh, labels, isDragging }) {
             </form>
           </div>
 
+          {task.activityLogs?.length > 0 && (
+            <div className="expanded-section">
+              <h4>Activity</h4>
+              <ul className="activity-log">
+                {task.activityLogs.map(a => (
+                  <li key={a.id} className="activity-item">
+                    <span className="activity-dot" />
+                    <div className="activity-body">
+                      <span className="activity-action">{a.action}</span>
+                      <span className="activity-meta">{a.username} · {new Date(a.createdAt).toLocaleString()}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="expanded-section">
             <h4>Comments</h4>
             {task.comments?.map(c => (

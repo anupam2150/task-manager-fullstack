@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TaskManager.API.Data;
 
@@ -10,40 +11,14 @@ using TaskManager.API.Data;
 namespace TaskManager.API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260628043143_AddLabelsCommentsSubtasks")]
+    partial class AddLabelsCommentsSubtasks
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
-
-            modelBuilder.Entity("TaskManager.API.Models.ActivityLog", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Action")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("TaskId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TaskId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("ActivityLogs");
-                });
 
             modelBuilder.Entity("TaskManager.API.Models.Comment", b =>
                 {
@@ -229,25 +204,6 @@ namespace TaskManager.API.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("TaskManager.API.Models.ActivityLog", b =>
-                {
-                    b.HasOne("TaskManager.API.Models.TaskItem", "Task")
-                        .WithMany("ActivityLogs")
-                        .HasForeignKey("TaskId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("TaskManager.API.Models.User", "User")
-                        .WithMany("ActivityLogs")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Task");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("TaskManager.API.Models.Comment", b =>
                 {
                     b.HasOne("TaskManager.API.Models.User", "Author")
@@ -349,8 +305,6 @@ namespace TaskManager.API.Migrations
 
             modelBuilder.Entity("TaskManager.API.Models.TaskItem", b =>
                 {
-                    b.Navigation("ActivityLogs");
-
                     b.Navigation("Comments");
 
                     b.Navigation("SubTasks");
@@ -360,8 +314,6 @@ namespace TaskManager.API.Migrations
 
             modelBuilder.Entity("TaskManager.API.Models.User", b =>
                 {
-                    b.Navigation("ActivityLogs");
-
                     b.Navigation("AssignedTasks");
 
                     b.Navigation("Comments");
