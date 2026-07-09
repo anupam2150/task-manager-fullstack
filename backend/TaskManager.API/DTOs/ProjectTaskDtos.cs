@@ -30,6 +30,7 @@ public record TaskDto(
     int TimeSpentSeconds,
     bool IsArchived,
     DateTime? ArchivedAt,
+    RecurrenceType Recurrence,
     List<LabelDto> Labels,
     List<SubTaskDto> SubTasks,
     List<CommentDto> Comments,
@@ -40,7 +41,8 @@ public record CreateTaskDto(
     [StringLength(1000)] string Description,
     TaskPriority Priority,
     DateTime? DueDate,
-    int? AssignedToId);
+    int? AssignedToId,
+    RecurrenceType Recurrence = RecurrenceType.None);
 
 public record UpdateTaskDto(
     [Required, StringLength(200, MinimumLength = 1)] string Title,
@@ -48,4 +50,5 @@ public record UpdateTaskDto(
     Models.TaskStatus Status,
     TaskPriority Priority,
     DateTime? DueDate,
-    int? AssignedToId);
+    int? AssignedToId,
+    RecurrenceType Recurrence = RecurrenceType.None);

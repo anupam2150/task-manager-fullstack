@@ -397,6 +397,16 @@ body {
 .badge.medium { background: #fef3c7; color: #d97706; }
 .badge.high { background: #fee2e2; color: #dc2626; }
 
+.badge-recurrence {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 20px;
+  font-weight: 600;
+  background: #ede9fe;
+  color: #7c3aed;
+  letter-spacing: 0.03em;
+}
+
 /* ── Empty & Loading States ── */
 .loading {
   text-align: center;

@@ -18,7 +18,7 @@ public class TasksController(AppDbContext db) : ControllerBase
     private static TaskDto ToDto(TaskItem t) => new(
         t.Id, t.Title, t.Description, t.Status, t.Priority,
         t.DueDate, t.CreatedAt, t.ProjectId, t.AssignedToId,
-        t.TimeSpentSeconds, t.IsArchived, t.ArchivedAt,
+        t.TimeSpentSeconds, t.IsArchived, t.ArchivedAt, t.Recurrence,
         t.TaskLabels.Select(tl => new LabelDto(tl.Label.Id, tl.Label.Name, tl.Label.Color)).ToList(),
         t.SubTasks.Select(s => new SubTaskDto(s.Id, s.Title, s.IsCompleted)).ToList(),
         t.Comments.Select(c => new CommentDto(c.Id, c.Content, c.CreatedAt, c.Author.Username)).ToList(),
@@ -73,7 +73,8 @@ public class TasksController(AppDbContext db) : ControllerBase
         {
             Title = dto.Title, Description = dto.Description,
             Priority = dto.Priority, DueDate = dto.DueDate,
-            AssignedToId = dto.AssignedToId, ProjectId = projectId
+            AssignedToId = dto.AssignedToId, ProjectId = projectId,
+            Recurrence = dto.Recurrence
         };
         db.Tasks.Add(task);
         await db.SaveChangesAsync();
@@ -99,6 +100,7 @@ public class TasksController(AppDbContext db) : ControllerBase
         task.Title = dto.Title; task.Description = dto.Description;
         task.Status = dto.Status; task.Priority = dto.Priority;
         task.DueDate = dto.DueDate; task.AssignedToId = dto.AssignedToId;
+        task.Recurrence = dto.Recurrence;
         await db.SaveChangesAsync();
 
         foreach (var change in changes)

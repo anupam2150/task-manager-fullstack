@@ -2,6 +2,7 @@ namespace TaskManager.API.Models;
 
 public enum TaskStatus { Todo, InProgress, Done }
 public enum TaskPriority { Low, Medium, High }
+public enum RecurrenceType { None, Daily, Weekly, Monthly }
 
 public class TaskItem
 {
@@ -23,4 +24,6 @@ public class TaskItem
     public int TimeSpentSeconds { get; set; } = 0;
     public bool IsArchived { get; set; } = false;
     public DateTime? ArchivedAt { get; set; }
+    public RecurrenceType Recurrence { get; set; } = RecurrenceType.None;
+    public bool RecurrenceSpawned { get; set; } = false;
 }

@@ -164,6 +164,11 @@ function TaskCardInner({ task, projectId, onRefresh, labels, isDragging }) {
         <strong>{task.title}</strong>
         <div className="task-card-badges">
           <span className={`badge ${task.priority.toLowerCase()}`}>{task.priority}</span>
+          {task.recurrence && task.recurrence !== 'None' && (
+            <span className="badge-recurrence">
+              {task.recurrence === 'Daily' ? '🔁 Daily' : task.recurrence === 'Weekly' ? '🔁 Weekly' : '🔁 Monthly'}
+            </span>
+          )}
           {dueBadge && <span className={`due-badge ${dueBadge.cls}`}>{dueBadge.label}</span>}
         </div>
       </div>
@@ -341,7 +346,7 @@ export default function Tasks() {
   const { push } = useNotif();
   const [tasks, setTasks] = useState([]);
   const [labels, setLabels] = useState([]);
-  const [form, setForm] = useState({ title: '', description: '', priority: 'Medium', dueDate: '' });
+  const [form, setForm] = useState({ title: '', description: '', priority: 'Medium', dueDate: '', recurrence: 'None' });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
@@ -406,7 +411,7 @@ export default function Tasks() {
     try {
       setSubmitting(true);
       await api.post(`/projects/${safeProjectId}/tasks`, { ...form, dueDate: form.dueDate || null });
-      setForm({ title: '', description: '', priority: 'Medium', dueDate: '' });
+      setForm({ title: '', description: '', priority: 'Medium', dueDate: '', recurrence: 'None' });
       push('Task created!', 'success');
       load();
     } catch (err) {
@@ -492,6 +497,12 @@ export default function Tasks() {
           {PRIORITIES.map(p => <option key={p}>{p}</option>)}
         </select>
         <input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} />
+        <select value={form.recurrence} onChange={e => setForm({ ...form, recurrence: e.target.value })}>
+          <option value="None">No Repeat</option>
+          <option value="Daily">Daily</option>
+          <option value="Weekly">Weekly</option>
+          <option value="Monthly">Monthly</option>
+        </select>
         <button type="submit" className="btn-add" disabled={submitting}>
           {submitting ? 'Adding...' : '+ Add Task'}
         </button>
