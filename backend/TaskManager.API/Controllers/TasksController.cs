@@ -23,7 +23,8 @@ public class TasksController(AppDbContext db) : ControllerBase
         t.SubTasks.Select(s => new SubTaskDto(s.Id, s.Title, s.IsCompleted)).ToList(),
         t.Comments.Select(c => new CommentDto(c.Id, c.Content, c.CreatedAt, c.Author.Username)).ToList(),
         t.ActivityLogs.OrderByDescending(a => a.CreatedAt)
-            .Select(a => new ActivityLogDto(a.Id, a.Action, a.CreatedAt, a.User.Username)).ToList()
+            .Select(a => new ActivityLogDto(a.Id, a.Action, a.CreatedAt, a.User.Username)).ToList(),
+        t.BlockedBy.Select(d => d.BlockerId).ToList()
     );
 
     private async Task<bool> ProjectBelongsToUser(int projectId) =>
@@ -35,7 +36,8 @@ public class TasksController(AppDbContext db) : ControllerBase
             .Include(t => t.TaskLabels).ThenInclude(tl => tl.Label)
             .Include(t => t.SubTasks)
             .Include(t => t.Comments).ThenInclude(c => c.Author)
-            .Include(t => t.ActivityLogs).ThenInclude(a => a.User);
+            .Include(t => t.ActivityLogs).ThenInclude(a => a.User)
+            .Include(t => t.BlockedBy);
 
     private async Task Log(int taskId, string action)
     {
@@ -291,6 +293,37 @@ public class TasksController(AppDbContext db) : ControllerBase
         if (subtask is null) return NotFound();
         db.SubTasks.Remove(subtask);
         await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    // ── Dependencies ──
+    [HttpPost("{id}/dependencies/{blockerId}")]
+    [Consumes("application/json")]
+    public async Task<IActionResult> AddDependency(int projectId, int id, int blockerId)
+    {
+        if (!await ProjectBelongsToUser(projectId)) return Forbid();
+        if (id == blockerId) return BadRequest("A task cannot block itself.");
+        if (await db.TaskDependencies.AnyAsync(d => d.BlockedId == id && d.BlockerId == blockerId))
+            return Ok();
+        // Prevent circular: check blocker is not already blocked by this task
+        if (await db.TaskDependencies.AnyAsync(d => d.BlockedId == blockerId && d.BlockerId == id))
+            return BadRequest("Circular dependency detected.");
+        db.TaskDependencies.Add(new TaskDependency { BlockerId = blockerId, BlockedId = id });
+        await db.SaveChangesAsync();
+        await Log(id, $"Blocked by task #{blockerId}");
+        return Ok();
+    }
+
+    [HttpDelete("{id}/dependencies/{blockerId}")]
+    [Consumes("application/json")]
+    public async Task<IActionResult> RemoveDependency(int projectId, int id, int blockerId)
+    {
+        if (!await ProjectBelongsToUser(projectId)) return Forbid();
+        var dep = await db.TaskDependencies.FirstOrDefaultAsync(d => d.BlockedId == id && d.BlockerId == blockerId);
+        if (dep is null) return NotFound();
+        db.TaskDependencies.Remove(dep);
+        await db.SaveChangesAsync();
+        await Log(id, $"Dependency on task #{blockerId} removed");
         return NoContent();
     }
 

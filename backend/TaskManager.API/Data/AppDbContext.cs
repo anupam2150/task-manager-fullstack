@@ -13,6 +13,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Label> Labels => Set<Label>();
     public DbSet<TaskLabel> TaskLabels => Set<TaskLabel>();
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
+    public DbSet<TaskDependency> TaskDependencies => Set<TaskDependency>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -83,6 +84,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasOne(a => a.User)
             .WithMany(u => u.ActivityLogs)
             .HasForeignKey(a => a.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<TaskDependency>()
+            .HasKey(d => new { d.BlockerId, d.BlockedId });
+
+        modelBuilder.Entity<TaskDependency>()
+            .HasOne(d => d.Blocker)
+            .WithMany(t => t.Blocking)
+            .HasForeignKey(d => d.BlockerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<TaskDependency>()
+            .HasOne(d => d.Blocked)
+            .WithMany(t => t.BlockedBy)
+            .HasForeignKey(d => d.BlockedId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

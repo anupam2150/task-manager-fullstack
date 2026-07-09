@@ -34,7 +34,7 @@ const getDueBadge = (dueDate, status) => {
   return null;
 };
 
-function TaskCardInner({ task, projectId, onRefresh, labels, isDragging }) {
+function TaskCardInner({ task, projectId, onRefresh, labels, allTasks, isDragging }) {
   const { push } = useNotif();
   const [expanded, setExpanded] = useState(false);
   const [comment, setComment] = useState('');
@@ -42,6 +42,7 @@ function TaskCardInner({ task, projectId, onRefresh, labels, isDragging }) {
   const [timerRunning, setTimerRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef(null);
+  const [depTaskId, setDepTaskId] = useState('');
 
   const safeId = (id) => Number.isInteger(id) && id > 0;
 
@@ -153,6 +154,30 @@ function TaskCardInner({ task, projectId, onRefresh, labels, isDragging }) {
     } catch { push('Failed to remove label', 'error'); }
   };
 
+  const handleAddDep = async (e) => {
+    e.preventDefault();
+    const blockerId = parseInt(depTaskId, 10);
+    if (!blockerId) return;
+    try {
+      await api.post(`/projects/${projectId}/tasks/${task.id}/dependencies/${blockerId}`);
+      setDepTaskId('');
+      push('Dependency added', 'success');
+      onRefresh();
+    } catch (err) { push(extractError(err, 'Failed to add dependency'), 'error'); }
+  };
+
+  const handleRemoveDep = async (blockerId) => {
+    try {
+      await api.delete(`/projects/${projectId}/tasks/${task.id}/dependencies/${blockerId}`);
+      onRefresh();
+    } catch { push('Failed to remove dependency', 'error'); }
+  };
+
+  const isBlocked = task.blockedByIds?.some(id => {
+    const blocker = allTasks?.find(t => t.id === id);
+    return blocker && blocker.status !== 'Done';
+  });
+
   const dueBadge = getDueBadge(task.dueDate, task.status);
   const completedSubs = task.subTasks?.filter(s => s.isCompleted).length ?? 0;
   const totalSubs = task.subTasks?.length ?? 0;
@@ -169,6 +194,7 @@ function TaskCardInner({ task, projectId, onRefresh, labels, isDragging }) {
               {task.recurrence === 'Daily' ? '🔁 Daily' : task.recurrence === 'Weekly' ? '🔁 Weekly' : '🔁 Monthly'}
             </span>
           )}
+          {isBlocked && <span className="badge-blocked">🚫 Blocked</span>}
           {dueBadge && <span className={`due-badge ${dueBadge.cls}`}>{dueBadge.label}</span>}
         </div>
       </div>
@@ -240,6 +266,33 @@ function TaskCardInner({ task, projectId, onRefresh, labels, isDragging }) {
           )}
 
           <div className="expanded-section">
+            <h4>🔗 Blocked By</h4>
+            {task.blockedByIds?.length > 0 ? (
+              task.blockedByIds.map(bid => {
+                const blocker = allTasks?.find(t => t.id === bid);
+                const done = blocker?.status === 'Done';
+                return (
+                  <div key={bid} className="dep-item">
+                    <span className={`dep-title ${done ? 'dep-done' : 'dep-pending'}`}>
+                      {done ? '✅' : '⏳'} {blocker ? blocker.title : `Task #${bid}`}
+                    </span>
+                    <button className="btn-icon-sm" onClick={() => handleRemoveDep(bid)}>✕</button>
+                  </div>
+                );
+              })
+            ) : <p className="dep-empty">No blockers</p>}
+            <form onSubmit={handleAddDep} className="mini-form">
+              <select value={depTaskId} onChange={e => setDepTaskId(e.target.value)}>
+                <option value="">Add blocker...</option>
+                {allTasks?.filter(t => t.id !== task.id && !task.blockedByIds?.includes(t.id)).map(t => (
+                  <option key={t.id} value={t.id}>#{t.id} {t.title}</option>
+                ))}
+              </select>
+              <button type="submit" className="btn-mini" disabled={!depTaskId}>Add</button>
+            </form>
+          </div>
+
+          <div className="expanded-section">
             <h4>Subtasks</h4>
             {task.subTasks?.map(s => (
               <div key={s.id} className="subtask-item">
@@ -298,7 +351,7 @@ function TaskCardInner({ task, projectId, onRefresh, labels, isDragging }) {
   );
 }
 
-function SortableTaskCard({ task, projectId, onRefresh, labels }) {
+function SortableTaskCard({ task, projectId, onRefresh, labels, allTasks }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `task-${task.id}`,
     data: { type: 'task', task }
@@ -313,13 +366,13 @@ function SortableTaskCard({ task, projectId, onRefresh, labels }) {
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
       <div {...listeners} style={{ cursor: 'grab', touchAction: 'none' }}>
-        <TaskCardInner task={task} projectId={projectId} onRefresh={onRefresh} labels={labels} isDragging={isDragging} />
+        <TaskCardInner task={task} projectId={projectId} onRefresh={onRefresh} labels={labels} allTasks={allTasks} isDragging={isDragging} />
       </div>
     </div>
   );
 }
 
-function DroppableColumn({ status, tasks, projectId, onRefresh, labels }) {
+function DroppableColumn({ status, tasks, projectId, onRefresh, labels, allTasks }) {
   return (
     <div className={`kanban-col ${COL_CLASS[status]}`}>
       <div className="kanban-col-header">
@@ -331,7 +384,7 @@ function DroppableColumn({ status, tasks, projectId, onRefresh, labels }) {
           <div className="empty-col-drop">Drop tasks here</div>
         ) : (
           tasks.map(task => (
-            <SortableTaskCard key={task.id} task={task} projectId={projectId} onRefresh={onRefresh} labels={labels} />
+            <SortableTaskCard key={task.id} task={task} projectId={projectId} onRefresh={onRefresh} labels={labels} allTasks={allTasks} />
           ))
         )}
       </SortableContext>
@@ -459,6 +512,18 @@ export default function Tasks() {
 
     if (!newStatus || newStatus === task.status) return;
 
+    // Block moving to Done if task has unresolved blockers
+    if (newStatus === 'Done') {
+      const isBlocked = task.blockedByIds?.some(id => {
+        const blocker = tasks.find(t => t.id === id);
+        return blocker && blocker.status !== 'Done';
+      });
+      if (isBlocked) {
+        push('Cannot mark as Done — task has unresolved blockers', 'error');
+        return;
+      }
+    }
+
     // Optimistic update
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
 
@@ -560,12 +625,13 @@ export default function Tasks() {
                 projectId={safeProjectId}
                 onRefresh={load}
                 labels={labels}
+                allTasks={tasks}
               />
             ))}
           </div>
           <DragOverlay>
             {activeTask && (
-              <TaskCardInner task={activeTask} projectId={safeProjectId} onRefresh={load} labels={labels} isDragging />
+              <TaskCardInner task={activeTask} projectId={safeProjectId} onRefresh={load} labels={labels} allTasks={tasks} isDragging />
             )}
           </DragOverlay>
         </DndContext>

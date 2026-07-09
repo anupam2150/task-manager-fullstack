@@ -809,3 +809,32 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
   transition: all 0.2s;
 }
 .btn-share-copy:hover { background: #c7d2fe; }
+
+/* ── Task Dependencies ── */
+.badge-blocked {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 20px;
+  font-weight: 600;
+  background: #fee2e2;
+  color: #dc2626;
+  letter-spacing: 0.03em;
+}
+
+.dep-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3rem 0;
+  gap: 0.5rem;
+}
+
+.dep-title {
+  font-size: 0.8rem;
+  font-weight: 500;
+  flex: 1;
+}
+
+.dep-done { color: #059669; text-decoration: line-through; opacity: 0.7; }
+.dep-pending { color: var(--text); }
+.dep-empty { font-size: 0.8rem; color: var(--text-faint); margin: 0.25rem 0; }

@@ -34,7 +34,8 @@ public record TaskDto(
     List<LabelDto> Labels,
     List<SubTaskDto> SubTasks,
     List<CommentDto> Comments,
-    List<ActivityLogDto> ActivityLogs);
+    List<ActivityLogDto> ActivityLogs,
+    List<int> BlockedByIds);
 
 public record CreateTaskDto(
     [Required, StringLength(200, MinimumLength = 1)] string Title,
