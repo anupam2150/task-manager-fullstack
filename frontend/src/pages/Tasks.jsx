@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   DndContext, PointerSensor, useSensor, useSensors,
@@ -39,8 +39,39 @@ function TaskCardInner({ task, projectId, onRefresh, labels, isDragging }) {
   const [expanded, setExpanded] = useState(false);
   const [comment, setComment] = useState('');
   const [subtaskTitle, setSubtaskTitle] = useState('');
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const timerRef = useRef(null);
 
   const safeId = (id) => Number.isInteger(id) && id > 0;
+
+  const startTimer = () => {
+    setTimerRunning(true);
+    timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
+  };
+
+  const stopTimer = async () => {
+    clearInterval(timerRef.current);
+    setTimerRunning(false);
+    if (elapsed <= 0) return;
+    try {
+      await api.post(`/projects/${projectId}/tasks/${task.id}/time`, { seconds: elapsed });
+      push(`Logged ${formatTime(elapsed)}`, 'success');
+      setElapsed(0);
+      onRefresh();
+    } catch { push('Failed to log time', 'error'); }
+  };
+
+  useEffect(() => () => clearInterval(timerRef.current), []);
+
+  const formatTime = (s) => {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${String(sec).padStart(2, '0')}s`;
+    return `${sec}s`;
+  };
 
   const handleDelete = async () => {
     if (!safeId(task.id) || !window.confirm(`Delete "${task.title}"?`)) return;
@@ -157,6 +188,17 @@ function TaskCardInner({ task, projectId, onRefresh, labels, isDragging }) {
       {task.comments?.length > 0 && (
         <small className="comment-count">💬 {task.comments.length} comment{task.comments.length !== 1 ? 's' : ''}</small>
       )}
+
+      <div className="task-timer">
+        <span className="timer-total">⏱ {formatTime(task.timeSpentSeconds + (timerRunning ? elapsed : 0))}</span>
+        {timerRunning ? (
+          <button className="btn-timer btn-timer-stop" onClick={stopTimer}>
+            ⏹ Stop {elapsed > 0 && `(+${formatTime(elapsed)})`}
+          </button>
+        ) : (
+          <button className="btn-timer btn-timer-start" onClick={startTimer}>▶ Start</button>
+        )}
+      </div>
 
       <div className="task-card-footer">
         <button className="btn-icon" onClick={() => setExpanded(e => !e)} title="Details">

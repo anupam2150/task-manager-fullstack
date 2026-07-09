@@ -18,6 +18,7 @@ public class TasksController(AppDbContext db) : ControllerBase
     private static TaskDto ToDto(TaskItem t) => new(
         t.Id, t.Title, t.Description, t.Status, t.Priority,
         t.DueDate, t.CreatedAt, t.ProjectId, t.AssignedToId,
+        t.TimeSpentSeconds,
         t.TaskLabels.Select(tl => new LabelDto(tl.Label.Id, tl.Label.Name, tl.Label.Color)).ToList(),
         t.SubTasks.Select(s => new SubTaskDto(s.Id, s.Title, s.IsCompleted)).ToList(),
         t.Comments.Select(c => new CommentDto(c.Id, c.Content, c.CreatedAt, c.Author.Username)).ToList(),
@@ -117,6 +118,31 @@ public class TasksController(AppDbContext db) : ControllerBase
         db.Tasks.Remove(task);
         await db.SaveChangesAsync();
         return NoContent();
+    }
+
+    // ── Time Tracking ──
+    [HttpPost("{id}/time")]
+    [Consumes("application/json")]
+    public async Task<IActionResult> LogTime(int projectId, int id, LogTimeDto dto)
+    {
+        if (!await ProjectBelongsToUser(projectId)) return Forbid();
+        var task = await db.Tasks.FirstOrDefaultAsync(t => t.Id == id && t.ProjectId == projectId);
+        if (task is null) return NotFound();
+        if (dto.Seconds <= 0) return BadRequest("Seconds must be positive.");
+        task.TimeSpentSeconds += dto.Seconds;
+        await db.SaveChangesAsync();
+        await Log(id, $"Logged {FormatTime(dto.Seconds)} of work");
+        return Ok(new { timeSpentSeconds = task.TimeSpentSeconds });
+    }
+
+    private static string FormatTime(int seconds)
+    {
+        var h = seconds / 3600;
+        var m = (seconds % 3600) / 60;
+        var s = seconds % 60;
+        if (h > 0) return $"{h}h {m}m";
+        if (m > 0) return $"{m}m {s}s";
+        return $"{s}s";
     }
 
     // ── Labels ──

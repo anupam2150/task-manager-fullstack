@@ -20,11 +20,14 @@ public record CreateCommentDto([Required, StringLength(1000)] string Content);
 
 public record ActivityLogDto(int Id, string Action, DateTime CreatedAt, string Username);
 
+public record LogTimeDto(int Seconds);
+
 public record TaskDto(
     int Id, string Title, string Description,
     Models.TaskStatus Status, TaskPriority Priority,
     DateTime? DueDate, DateTime CreatedAt,
     int ProjectId, int? AssignedToId,
+    int TimeSpentSeconds,
     List<LabelDto> Labels,
     List<SubTaskDto> SubTasks,
     List<CommentDto> Comments,

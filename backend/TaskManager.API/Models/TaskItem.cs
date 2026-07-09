@@ -20,4 +20,5 @@ public class TaskItem
     public ICollection<SubTask> SubTasks { get; set; } = [];
     public ICollection<TaskLabel> TaskLabels { get; set; } = [];
     public ICollection<ActivityLog> ActivityLogs { get; set; } = [];
+    public int TimeSpentSeconds { get; set; } = 0;
 }
