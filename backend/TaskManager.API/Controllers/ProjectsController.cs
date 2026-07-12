@@ -19,7 +19,7 @@ public class ProjectsController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         page = Math.Max(1, page);
-        pageSize = Math.Clamp(pageSize, 1, 50);
+        pageSize = Math.Clamp(pageSize, 1, 100);
         var query = db.Projects.Where(p => p.OwnerId == UserId);
         var total = await query.CountAsync();
         var items = await query

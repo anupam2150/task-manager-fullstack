@@ -18,7 +18,8 @@ public class JwtService(IConfiguration config, string jwtKey)
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Name, user.Username)
+            new Claim(ClaimTypes.Name, user.Username),
+            new Claim("isAdmin", user.IsAdmin.ToString().ToLower())
         };
 
         var token = new JwtSecurityToken(

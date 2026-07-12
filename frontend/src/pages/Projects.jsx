@@ -1,7 +1,48 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import api from '../api/api';
 import { useNotif } from '../context/NotifContext';
+
+
+const DUMMY_PROJECTS = [
+  {
+    id: 'd1', name: 'TaskManager Web App',
+    description: 'Full stack task management app built with ASP.NET Core 10 + React 19. My biggest personal project.',
+    taskCount: 18, completedCount: 14, inProgressCount: 3,
+    createdAt: '2025-01-10', shareToken: null,
+  },
+  {
+    id: 'd2', name: 'LinkedIn Launch & Portfolio',
+    description: 'Everything needed to showcase and launch the project publicly — post, demo video, screenshots.',
+    taskCount: 8, completedCount: 3, inProgressCount: 3,
+    createdAt: '2025-03-01', shareToken: null,
+  },
+  {
+    id: 'd3', name: 'Personal Portfolio Site',
+    description: 'Redesigning my portfolio with new projects, skills section and dark mode.',
+    taskCount: 7, completedCount: 5, inProgressCount: 1,
+    createdAt: '2024-11-20', shareToken: null,
+  },
+  {
+    id: 'd4', name: 'DSA Practice Tracker',
+    description: 'Tracking LeetCode and DSA problems by topic — arrays, trees, DP, graphs.',
+    taskCount: 6, completedCount: 5, inProgressCount: 1,
+    createdAt: '2024-10-05', shareToken: null,
+  },
+  {
+    id: 'd5', name: 'Learning Roadmap 2025',
+    description: 'Topics to learn this year: system design, cloud, advanced React patterns.',
+    taskCount: 5, completedCount: 3, inProgressCount: 1,
+    createdAt: '2025-01-01', shareToken: null,
+  },
+  {
+    id: 'd6', name: 'Side Project Ideas',
+    description: 'Backlog of app ideas to explore — SaaS tools, open source contributions, experiments.',
+    taskCount: 3, completedCount: 1, inProgressCount: 0,
+    createdAt: '2024-12-15', shareToken: null,
+  },
+];
 
 const extractError = (err, fallback) => {
   const data = err.response?.data;
@@ -73,11 +114,14 @@ export default function Projects() {
   const [sharingId, setSharingId] = useState(null);
   const navigate = useNavigate();
   const { push } = useNotif();
+  const { user } = useAuth();
+  const isTestAccount = user?.isAdmin === true;
+  const showDummy = isTestAccount && projects.length === 0;
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [projRes, labelRes] = await Promise.all([api.get('/projects'), api.get('/labels')]);
+      const [projRes, labelRes] = await Promise.all([api.get('/projects?pageSize=100'), api.get('/labels')]);
       setProjects(projRes.data.items ?? projRes.data);
       setLabels(labelRes.data);
     } catch (err) {
@@ -152,7 +196,7 @@ export default function Projects() {
       <div className="proj-hero">
         <div className="proj-hero-text">
           <h1 className="proj-hero-title">My Projects</h1>
-          <p className="proj-hero-sub">{loading ? '…' : `${projects.length} project${projects.length !== 1 ? 's' : ''}`}</p>
+          <p className="proj-hero-sub">{loading ? '…' : `${showDummy ? DUMMY_PROJECTS.length : projects.length} project${(showDummy ? DUMMY_PROJECTS.length : projects.length) !== 1 ? 's' : ''}`}</p>
         </div>
         <div className="proj-hero-actions">
           <button className="btn-outline proj-labels-btn" onClick={() => setShowLabels(s => !s)}>
@@ -198,7 +242,7 @@ export default function Projects() {
         <div className="projects-grid">
           {[1,2,3].map(i => <SkeletonCard key={i} />)}
         </div>
-      ) : projects.length === 0 ? (
+      ) : projects.length === 0 && !showDummy ? (
         <div className="proj-empty">
           <div className="proj-empty-icon">📋</div>
           <h3>No projects yet</h3>
@@ -207,11 +251,12 @@ export default function Projects() {
         </div>
       ) : (
         <>
-          <p className="section-title">{projects.length} Project{projects.length !== 1 ? 's' : ''}</p>
+          <p className="section-title">{(showDummy ? DUMMY_PROJECTS : projects).length} Project{(showDummy ? DUMMY_PROJECTS : projects).length !== 1 ? 's' : ''}</p>
           <div className="projects-grid">
-            {projects.map((p, i) => {
+            {(showDummy ? DUMMY_PROJECTS : projects).map((p, i) => {
               const accent = CARD_ACCENTS[i % CARD_ACCENTS.length];
               const pct = p.taskCount > 0 ? Math.round((p.completedCount / p.taskCount) * 100) : 0;
+              const isDummy = showDummy;
               return (
                 <div key={p.id} className="proj-card">
                   <div className="proj-card-accent" style={{ background: accent }} />
@@ -246,17 +291,17 @@ export default function Projects() {
                       <div className="proj-card-progress-fill" style={{ width: `${pct}%`, background: accent }} />
                     </div>
                     <div className="proj-card-footer">
-                      <button className="proj-btn-view" onClick={() => navigate(`/projects/${p.id}`)}>View Tasks</button>
+                      <button className="proj-btn-view" onClick={() => !isDummy && navigate(`/projects/${p.id}`)} style={{ opacity: isDummy ? 0.5 : 1, cursor: isDummy ? 'default' : 'pointer' }}>View Tasks</button>
                       <div className="proj-card-secondary">
-                        {p.shareToken ? (
+                        {!isDummy && (p.shareToken ? (
                           <>
                             <button className="proj-icon-btn proj-icon-btn--share" onClick={() => copyLink(p.shareToken)} title="Copy share link">🔗</button>
                             <button className="proj-icon-btn proj-icon-btn--lock" onClick={() => handleRevoke(p.id)} title="Revoke link">🔒</button>
                           </>
                         ) : (
                           <button className="proj-icon-btn proj-icon-btn--share" onClick={() => handleShare(p.id)} disabled={sharingId === p.id} title="Generate share link">🔗</button>
-                        )}
-                        <button className="proj-icon-btn proj-icon-btn--del" onClick={() => handleDelete(p.id, p.name)} title="Delete project">🗑</button>
+                        ))}
+                        {!isDummy && <button className="proj-icon-btn proj-icon-btn--del" onClick={() => handleDelete(p.id, p.name)} title="Delete project">🗑</button>}
                       </div>
                     </div>
                   </div>

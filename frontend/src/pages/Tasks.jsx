@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import CalendarView from '../components/CalendarView';
+import TaskTemplates from '../components/TaskTemplates';
 import {
   DndContext, PointerSensor, useSensor, useSensors,
   DragOverlay, closestCorners
@@ -10,14 +12,11 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import api from '../api/api';
 import { useNotif } from '../context/NotifContext';
-import TaskEditModal from '../components/TaskEditModal';
 
 const STATUSES = ['Todo', 'InProgress', 'Done'];
 const PRIORITIES = ['Low', 'Medium', 'High'];
 const COL_CLASS = { Todo: 'todo', InProgress: 'inprogress', Done: 'done' };
 const COL_LABEL = { Todo: 'To Do', InProgress: 'In Progress', Done: 'Done' };
-const TABS = ['details', 'subtasks', 'deps', 'activity', 'comments'];
-const TAB_LABEL = { details: 'Labels', subtasks: 'Subtasks', deps: 'Blockers', activity: 'Activity', comments: 'Comments' };
 
 const extractError = (err, fallback) => {
   const data = err.response?.data;
@@ -37,10 +36,9 @@ const getDueBadge = (dueDate, status) => {
   return null;
 };
 
-function TaskCardInner({ task, projectId, onRefresh, labels, allTasks, isDragging, onEdit }) {
+function TaskCardInner({ task, projectId, onRefresh, labels, allTasks, isDragging }) {
   const { push } = useNotif();
   const [expanded, setExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState('details');
   const [comment, setComment] = useState('');
   const [subtaskTitle, setSubtaskTitle] = useState('');
   const [timerRunning, setTimerRunning] = useState(false);
@@ -251,113 +249,106 @@ function TaskCardInner({ task, projectId, onRefresh, labels, allTasks, isDraggin
         <button className="btn-icon" onClick={() => setExpanded(e => !e)} title="Details">
           {expanded ? '▲ Hide' : '▼ Details'}
         </button>
-        <button className="btn-icon" onClick={() => onEdit(task)} title="Edit task">✏️</button>
         <button className="btn-archive" onClick={handleArchive} title="Archive task">📦</button>
         <button className="btn-delete" onClick={handleDelete}>🗑</button>
       </div>
 
       {expanded && (
         <div className="task-expanded">
-          <div className="tc-tabs">
-            {TABS.map(t => (
-              <button key={t} className={`tc-tab${activeTab === t ? ' tc-tab--active' : ''}`} onClick={() => setActiveTab(t)}>
-                {TAB_LABEL[t]}
-                {t === 'comments' && task.comments?.length > 0 && <span className="tc-tab-count">{task.comments.length}</span>}
-                {t === 'subtasks' && totalSubs > 0 && <span className="tc-tab-count">{completedSubs}/{totalSubs}</span>}
-              </button>
-            ))}
+          {labels.length > 0 && (
+            <div className="expanded-section">
+              <h4>Add Labels</h4>
+              <div className="label-options">
+                {labels.filter(l => !task.labels?.find(tl => tl.id === l.id)).map(l => (
+                  <span key={l.id} className="label-chip label-chip-add"
+                    style={{ background: l.color + '22', color: l.color, border: `1px solid ${l.color}`, cursor: 'pointer' }}
+                    onClick={() => handleAddLabel(l.id)}>
+                    + {l.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="expanded-section">
+            <h4>🔗 Blocked By</h4>
+            {task.blockedByIds?.length > 0 ? (
+              task.blockedByIds.map(bid => {
+                const blocker = allTasks?.find(t => t.id === bid);
+                const done = blocker?.status === 'Done';
+                return (
+                  <div key={bid} className="dep-item">
+                    <span className={`dep-title ${done ? 'dep-done' : 'dep-pending'}`}>
+                      {done ? '✅' : '⏳'} {blocker ? blocker.title : `Task #${bid}`}
+                    </span>
+                    <button className="btn-icon-sm" onClick={() => handleRemoveDep(bid)}>✕</button>
+                  </div>
+                );
+              })
+            ) : <p className="dep-empty">No blockers</p>}
+            <form onSubmit={handleAddDep} className="mini-form">
+              <select value={depTaskId} onChange={e => setDepTaskId(e.target.value)}>
+                <option value="">Add blocker...</option>
+                {allTasks?.filter(t => t.id !== task.id && !task.blockedByIds?.includes(t.id)).map(t => (
+                  <option key={t.id} value={t.id}>#{t.id} {t.title}</option>
+                ))}
+              </select>
+              <button type="submit" className="btn-mini" disabled={!depTaskId}>Add</button>
+            </form>
           </div>
-          <div className="tc-tab-body">
-            {activeTab === 'details' && (
-              <div className="expanded-section">
-                {labels.filter(l => !task.labels?.find(tl => tl.id === l.id)).length > 0 ? (
-                  <div className="label-options">
-                    {labels.filter(l => !task.labels?.find(tl => tl.id === l.id)).map(l => (
-                      <span key={l.id} className="label-chip label-chip-add"
-                        style={{ background: l.color + '22', color: l.color, border: `1px solid ${l.color}`, cursor: 'pointer' }}
-                        onClick={() => handleAddLabel(l.id)}>+ {l.name}</span>
-                    ))}
-                  </div>
-                ) : <p className="dep-empty">All labels assigned</p>}
+
+          <div className="expanded-section">
+            <h4>Subtasks</h4>
+            {task.subTasks?.map(s => (
+              <div key={s.id} className="subtask-item">
+                <input type="checkbox" checked={s.isCompleted} onChange={() => handleToggleSubtask(s)} />
+                <span style={{ textDecoration: s.isCompleted ? 'line-through' : 'none', color: s.isCompleted ? '#94a3b8' : 'inherit' }}>
+                  {s.title}
+                </span>
+                <button className="btn-icon-sm" onClick={() => handleDeleteSubtask(s.id)}>✕</button>
               </div>
-            )}
-            {activeTab === 'subtasks' && (
-              <div className="expanded-section">
-                {task.subTasks?.map(s => (
-                  <div key={s.id} className="subtask-item">
-                    <input type="checkbox" checked={s.isCompleted} onChange={() => handleToggleSubtask(s)} />
-                    <span className={s.isCompleted ? 'subtask-done' : ''}>{s.title}</span>
-                    <button className="btn-icon-sm" onClick={() => handleDeleteSubtask(s.id)}>✕</button>
-                  </div>
-                ))}
-                <form onSubmit={handleAddSubtask} className="mini-form">
-                  <input placeholder="Add subtask..." value={subtaskTitle} onChange={e => setSubtaskTitle(e.target.value)} />
-                  <button type="submit" className="btn-mini">Add</button>
-                </form>
-              </div>
-            )}
-            {activeTab === 'deps' && (
-              <div className="expanded-section">
-                {task.blockedByIds?.length > 0 ? (
-                  task.blockedByIds.map(bid => {
-                    const blocker = allTasks?.find(t => t.id === bid);
-                    const done = blocker?.status === 'Done';
-                    return (
-                      <div key={bid} className="dep-item">
-                        <span className={`dep-title ${done ? 'dep-done' : 'dep-pending'}`}>
-                          {done ? '✅' : '⏳'} {blocker ? blocker.title : `Task #${bid}`}
-                        </span>
-                        <button className="btn-icon-sm" onClick={() => handleRemoveDep(bid)}>✕</button>
-                      </div>
-                    );
-                  })
-                ) : <p className="dep-empty">No blockers</p>}
-                <form onSubmit={handleAddDep} className="mini-form">
-                  <select value={depTaskId} onChange={e => setDepTaskId(e.target.value)}>
-                    <option value="">Add blocker...</option>
-                    {allTasks?.filter(t => t.id !== task.id && !task.blockedByIds?.includes(t.id)).map(t => (
-                      <option key={t.id} value={t.id}>#{t.id} {t.title}</option>
-                    ))}
-                  </select>
-                  <button type="submit" className="btn-mini" disabled={!depTaskId}>Add</button>
-                </form>
-              </div>
-            )}
-            {activeTab === 'activity' && (
-              <div className="expanded-section">
-                {task.activityLogs?.length > 0 ? (
-                  <ul className="activity-log">
-                    {task.activityLogs.map(a => (
-                      <li key={a.id} className="activity-item">
-                        <span className="activity-dot" />
-                        <div className="activity-body">
-                          <span className="activity-action">{a.action}</span>
-                          <span className="activity-meta">{a.username} · {new Date(a.createdAt).toLocaleString()}</span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : <p className="dep-empty">No activity yet</p>}
-              </div>
-            )}
-            {activeTab === 'comments' && (
-              <div className="expanded-section">
-                {task.comments?.map(c => (
-                  <div key={c.id} className="comment-item">
-                    <div className="comment-header">
-                      <strong>{c.authorUsername}</strong>
-                      <small>{new Date(c.createdAt).toLocaleString()}</small>
-                      <button className="btn-icon-sm" onClick={() => handleDeleteComment(c.id)}>✕</button>
+            ))}
+            <form onSubmit={handleAddSubtask} className="mini-form">
+              <input placeholder="Add subtask..." value={subtaskTitle}
+                onChange={e => setSubtaskTitle(e.target.value)} />
+              <button type="submit" className="btn-mini">Add</button>
+            </form>
+          </div>
+
+          {task.activityLogs?.length > 0 && (
+            <div className="expanded-section">
+              <h4>Activity</h4>
+              <ul className="activity-log">
+                {task.activityLogs.map(a => (
+                  <li key={a.id} className="activity-item">
+                    <span className="activity-dot" />
+                    <div className="activity-body">
+                      <span className="activity-action">{a.action}</span>
+                      <span className="activity-meta">{a.username} · {new Date(a.createdAt).toLocaleString()}</span>
                     </div>
-                    <p>{c.content}</p>
-                  </div>
+                  </li>
                 ))}
-                <form onSubmit={handleAddComment} className="mini-form">
-                  <input placeholder="Add a comment..." value={comment} onChange={e => setComment(e.target.value)} />
-                  <button type="submit" className="btn-mini">Post</button>
-                </form>
+              </ul>
+            </div>
+          )}
+
+          <div className="expanded-section">
+            <h4>Comments</h4>
+            {task.comments?.map(c => (
+              <div key={c.id} className="comment-item">
+                <div className="comment-header">
+                  <strong>{c.authorUsername}</strong>
+                  <small>{new Date(c.createdAt).toLocaleString()}</small>
+                  <button className="btn-icon-sm" onClick={() => handleDeleteComment(c.id)}>✕</button>
+                </div>
+                <p>{c.content}</p>
               </div>
-            )}
+            ))}
+            <form onSubmit={handleAddComment} className="mini-form">
+              <input placeholder="Add a comment..." value={comment}
+                onChange={e => setComment(e.target.value)} />
+              <button type="submit" className="btn-mini">Post</button>
+            </form>
           </div>
         </div>
       )}
@@ -365,7 +356,7 @@ function TaskCardInner({ task, projectId, onRefresh, labels, allTasks, isDraggin
   );
 }
 
-function SortableTaskCard({ task, projectId, onRefresh, labels, allTasks, onEdit }) {
+function SortableTaskCard({ task, projectId, onRefresh, labels, allTasks }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `task-${task.id}`,
     data: { type: 'task', task }
@@ -380,13 +371,13 @@ function SortableTaskCard({ task, projectId, onRefresh, labels, allTasks, onEdit
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
       <div {...listeners} style={{ cursor: 'grab', touchAction: 'none' }}>
-        <TaskCardInner task={task} projectId={projectId} onRefresh={onRefresh} labels={labels} allTasks={allTasks} isDragging={isDragging} onEdit={onEdit} />
+        <TaskCardInner task={task} projectId={projectId} onRefresh={onRefresh} labels={labels} allTasks={allTasks} isDragging={isDragging} />
       </div>
     </div>
   );
 }
 
-function DroppableColumn({ status, tasks, projectId, onRefresh, labels, allTasks, onEdit }) {
+function DroppableColumn({ status, tasks, projectId, onRefresh, labels, allTasks }) {
   return (
     <div className={`kanban-col ${COL_CLASS[status]}`}>
       <div className="kanban-col-header">
@@ -398,7 +389,7 @@ function DroppableColumn({ status, tasks, projectId, onRefresh, labels, allTasks
           <div className="empty-col-drop">Drop tasks here</div>
         ) : (
           tasks.map(task => (
-            <SortableTaskCard key={task.id} task={task} projectId={projectId} onRefresh={onRefresh} labels={labels} allTasks={allTasks} onEdit={onEdit} />
+            <SortableTaskCard key={task.id} task={task} projectId={projectId} onRefresh={onRefresh} labels={labels} allTasks={allTasks} />
           ))
         )}
       </SortableContext>
@@ -422,8 +413,11 @@ export default function Tasks() {
   const [activeTask, setActiveTask] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
   const [archivedTasks, setArchivedTasks] = useState([]);
-  const [editingTask, setEditingTask] = useState(null);
-  const formRef = useRef(null);
+  const [view, setView] = useState('kanban'); // 'kanban' | 'calendar'
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [showHelp, setShowHelp] = useState(false);
+  const titleInputRef = useRef();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -444,7 +438,7 @@ export default function Tasks() {
     } finally {
       setLoading(false);
     }
-  }, [safeProjectId, push]);
+  }, [safeProjectId]);
 
   const loadArchived = useCallback(async () => {
     if (!safeProjectId) return;
@@ -452,7 +446,7 @@ export default function Tasks() {
       const res = await api.get(`/projects/${safeProjectId}/tasks/archived`);
       setArchivedTasks(res.data);
     } catch { push('Failed to load archived tasks', 'error'); }
-  }, [safeProjectId, push]);
+  }, [safeProjectId]);
 
   const handleRestore = async (taskId) => {
     try {
@@ -485,25 +479,74 @@ export default function Tasks() {
     } catch { push('Failed to export tasks', 'error'); }
   };
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
+  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e) => {
-      if (e.key === 'n' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-        formRef.current?.querySelector('input')?.focus();
-      }
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+      if (e.key === 'n') titleInputRef.current?.focus();
+      if (e.key === '?') setShowHelp(s => !s);
+      if (e.key === 'Escape') { setShowHelp(false); setSelectedIds(new Set()); }
+      if (e.key === 'c') setView(v => v === 'kanban' ? 'calendar' : 'kanban');
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
+
+  const toggleSelect = (id) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  const handleBulkStatus = async (status) => {
+    try {
+      await Promise.all([...selectedIds].map(id => {
+        const task = tasks.find(t => t.id === id);
+        if (!task) return Promise.resolve();
+        return api.put(`/projects/${safeProjectId}/tasks/${id}`, { ...task, status, dueDate: task.dueDate ?? null, assignedToId: task.assignedToId ?? null });
+      }));
+      push(`Updated ${selectedIds.size} tasks`, 'success');
+      setSelectedIds(new Set());
+      load();
+    } catch { push('Bulk update failed', 'error'); }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Delete ${selectedIds.size} tasks?`)) return;
+    try {
+      await Promise.all([...selectedIds].map(id => api.delete(`/projects/${safeProjectId}/tasks/${id}`)));
+      push(`Deleted ${selectedIds.size} tasks`, 'info');
+      setSelectedIds(new Set());
+      load();
+    } catch { push('Bulk delete failed', 'error'); }
+  };
+
+  const applyTemplate = (template) => {
+    const subtasks = template.subtaskTitles ? JSON.parse(template.subtaskTitles) : [];
+    setForm(f => ({ ...f, title: template.title, description: template.description ?? '', priority: template.priority }));
+    setShowTemplates(false);
+    titleInputRef.current?.focus();
+    push(`Template "${template.name}" applied`, 'success');
+    // store subtasks to auto-create after task is made
+    applyTemplate._pendingSubtasks = subtasks;
+  };
+  applyTemplate._pendingSubtasks = [];
 
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!safeProjectId) return;
     try {
       setSubmitting(true);
-      await api.post(`/projects/${safeProjectId}/tasks`, { ...form, dueDate: form.dueDate || null });
+      const res = await api.post(`/projects/${safeProjectId}/tasks`, { ...form, dueDate: form.dueDate || null });
+      const newTaskId = res.data?.id;
+      // auto-create subtasks from template
+      const pending = applyTemplate._pendingSubtasks ?? [];
+      if (newTaskId && pending.length > 0) {
+        await Promise.all(pending.map(title => api.post(`/projects/${safeProjectId}/tasks/${newTaskId}/subtasks`, { title })));
+        applyTemplate._pendingSubtasks = [];
+      }
       setForm({ title: '', description: '', priority: 'Medium', dueDate: '', recurrence: 'None' });
       push('Task created!', 'success');
       load();
@@ -587,42 +630,44 @@ export default function Tasks() {
 
   return (
     <div className="page">
-      <div className="tasks-page-header">
-        <div className="tasks-page-header-left">
-          <button className="back-btn" onClick={() => navigate('/')}>← Back</button>
-          <div>
-            <h2>Tasks</h2>
-            {overdueCount > 0 && (
-              <span className="overdue-banner">🚨 {overdueCount} overdue</span>
-            )}
-          </div>
+      <div className="page-header">
+        <button className="back-btn" onClick={() => navigate('/projects')}>← Back</button>
+        <h2>Tasks</h2>
+        {overdueCount > 0 && (
+          <span className="overdue-banner">🚨 {overdueCount} overdue task{overdueCount !== 1 ? 's' : ''}</span>
+        )}
+        <div className="tasks-view-toggle">
+          <button className={`view-btn${view === 'kanban' ? ' view-btn--active' : ''}`} onClick={() => setView('kanban')}>⬛ Kanban</button>
+          <button className={`view-btn${view === 'calendar' ? ' view-btn--active' : ''}`} onClick={() => setView('calendar')}>📅 Calendar</button>
         </div>
-        <div className="tasks-page-header-right">
-          <button className="btn-outline" onClick={() => { setShowArchived(s => !s); if (!showArchived) loadArchived(); }}>
-            📦 {showArchived ? 'Hide Archived' : 'Archived'}
-          </button>
-          <button className="btn-outline btn-export" onClick={handleExport}>⬇️ Export CSV</button>
-        </div>
+        <button className="btn-outline" onClick={() => setShowTemplates(s => !s)}>📋 Templates</button>
+        <button className="btn-outline" style={{ marginLeft: 'auto' }} onClick={() => { setShowArchived(s => !s); if (!showArchived) loadArchived(); }}>
+          📦 {showArchived ? 'Hide Archived' : 'View Archived'}
+        </button>
+        <button className="btn-outline btn-export" onClick={handleExport}>⬇️ Export CSV</button>
+        <button className="btn-outline" onClick={() => setShowHelp(true)} title="Keyboard shortcuts">⌨️</button>
       </div>
 
-      <form ref={formRef} onSubmit={handleCreate} className="add-form">
-        <div className="add-form-row">
-          <input placeholder="Task title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required />
-          <input placeholder="Description (optional)" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-        </div>
-        <div className="add-form-row">
-          <select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}>
-            {PRIORITIES.map(p => <option key={p}>{p}</option>)}
-          </select>
-          <input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} />
-          <select value={form.recurrence} onChange={e => setForm({ ...form, recurrence: e.target.value })}>
-            <option value="None">No Repeat</option>
-            <option value="Daily">Daily</option>
-            <option value="Weekly">Weekly</option>
-            <option value="Monthly">Monthly</option>
-          </select>
-          <button type="submit" className="btn-add" disabled={submitting}>{submitting ? 'Adding...' : '+ Add Task'}</button>
-        </div>
+      {showTemplates && <TaskTemplates onApply={applyTemplate} />}
+
+      <form onSubmit={handleCreate} className="add-form">
+        <input ref={titleInputRef} placeholder="Task title (press N)" value={form.title}
+          onChange={e => setForm({ ...form, title: e.target.value })} required />
+        <input placeholder="Description" value={form.description}
+          onChange={e => setForm({ ...form, description: e.target.value })} />
+        <select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}>
+          {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+        </select>
+        <input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} />
+        <select value={form.recurrence} onChange={e => setForm({ ...form, recurrence: e.target.value })}>
+          <option value="None">No Repeat</option>
+          <option value="Daily">Daily</option>
+          <option value="Weekly">Weekly</option>
+          <option value="Monthly">Monthly</option>
+        </select>
+        <button type="submit" className="btn-add" disabled={submitting}>
+          {submitting ? 'Adding...' : '+ Add Task'}
+        </button>
       </form>
 
       <div className="filter-bar">
@@ -643,8 +688,21 @@ export default function Tasks() {
         )}
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="bulk-bar">
+          <span className="bulk-count">{selectedIds.size} selected</span>
+          <button className="btn-mini" onClick={() => handleBulkStatus('Todo')}>Move to Todo</button>
+          <button className="btn-mini" onClick={() => handleBulkStatus('InProgress')}>Move to In Progress</button>
+          <button className="btn-mini" onClick={() => handleBulkStatus('Done')}>Mark Done</button>
+          <button className="btn-mini btn-mini--danger" onClick={handleBulkDelete}>Delete</button>
+          <button className="btn-outline" onClick={() => setSelectedIds(new Set())}>Clear</button>
+        </div>
+      )}
+
       {loading ? (
         <p className="loading">Loading tasks...</p>
+      ) : view === 'calendar' ? (
+        <CalendarView tasks={tasks} />
       ) : (
         <DndContext
           sensors={sensors}
@@ -662,7 +720,6 @@ export default function Tasks() {
                 onRefresh={load}
                 labels={labels}
                 allTasks={tasks}
-                onEdit={setEditingTask}
               />
             ))}
           </div>
@@ -674,14 +731,23 @@ export default function Tasks() {
         </DndContext>
       )}
 
-      {editingTask && (
-        <TaskEditModal
-          task={editingTask}
-          projectId={safeProjectId}
-          onClose={() => setEditingTask(null)}
-          onSaved={load}
-          push={push}
-        />
+      {showHelp && (
+        <div className="modal-overlay" onClick={() => setShowHelp(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>⌨️ Keyboard Shortcuts</h3>
+              <button className="modal-close" onClick={() => setShowHelp(false)}>✕</button>
+            </div>
+            <div className="shortcuts-list">
+              {[['N','Focus new task input'],['C','Toggle Calendar / Kanban view'],['?','Show this help'],['Esc','Close modals / clear selection']].map(([key, desc]) => (
+                <div key={key} className="shortcut-item">
+                  <kbd className="shortcut-key">{key}</kbd>
+                  <span>{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {showArchived && (

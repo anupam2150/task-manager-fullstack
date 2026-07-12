@@ -15,3 +15,9 @@ public record LoginDto(
     [Required] string Password);
 
 public record AuthResponseDto(string Token, string Username, string Email);
+
+public record UpdateProfileDto(string? Username, string? CurrentPassword,
+    [StringLength(100, MinimumLength = 8), RegularExpression(
+        @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z\d]).+$",
+        ErrorMessage = "Password must have uppercase, lowercase, digit and special character.")]
+    string? NewPassword);

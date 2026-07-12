@@ -1,25 +1,40 @@
-# TaskManager - Full Stack .NET + React App
+# TaskManager — Full Stack .NET + React App
 
 A full stack task management application built with ASP.NET Core 10 Web API and React 19.
 
 ## Features
 
-- **Authentication** — User registration and login with JWT
-- **Projects** — Create, update, delete projects with progress tracking
+### Tasks & Projects
+- **Projects** — Create, update, delete projects with progress tracking and completion percentage
 - **Kanban Board** — Drag & drop tasks across Todo / In Progress / Done columns
 - **Task Priorities & Due Dates** — Low / Medium / High with overdue/due-soon indicators
+- **Task Dependencies** — Mark tasks as blocked-by other tasks; blocks moving to Done until resolved
+- **Subtasks** — Checklist items per task with progress bar
+- **Labels** — Color-coded labels assignable to tasks
+- **Comments** — Per-task comment thread
 - **Task Activity Log** — Automatic timeline of all changes per task
-- **Time Tracking** — Start/stop timer per task, logs time spent
+- **Time Tracking** — Start/stop timer per task, logs cumulative time spent
 - **Task Archiving** — Archive and restore tasks, with a dedicated archived panel
 - **Recurring Tasks** — Daily / Weekly / Monthly auto-spawn via background service
+- **Task Templates** — Save and reuse task templates with pre-filled subtasks
+- **Bulk Actions** — Select multiple tasks to move status or delete at once
 - **CSV Export** — Download all tasks for a project as a CSV file
-- **System Theme** — Auto dark/light mode from OS preference with manual toggle
+
+### Navigation & UX
+- **Dashboard** — Stats overview, completion ring, bar chart, recent tasks, highlights panel
+- **Navbar Search** — Live project search with dropdown results
+- **Notifications** — Bell icon with overdue/due-soon alerts, mark-read, dismiss
+- **Calendar View** — Monthly calendar showing tasks by due date
+- **Keyboard Shortcuts** — `N` focus input, `C` toggle calendar, `?` help, `Esc` close
+- **Onboarding Tour** — First-time user walkthrough
+- **System Theme** — Auto dark/light mode from OS preference with manual toggle, persisted to localStorage
+- **Responsive Design** — Fully mobile-friendly across all screen sizes
+
+### Auth & Sharing
+- **Authentication** — Register and login with JWT, parsed client-side for role info
 - **Public Project Sharing** — Generate a read-only shareable link per project
-- **Task Dependencies** — Mark tasks as blocked-by other tasks; blocks moving to Done until resolved
-- **Labels** — Color-coded labels assignable to tasks
-- **Subtasks** — Checklist items per task with progress bar
-- **Comments** — Per-task comment thread
-- **Secure API** — Rate limiting, input validation, security headers
+- **Profile Page** — Update display name, email, upload avatar image
+- **Admin Role** — `IsAdmin` flag on users; admin-only account creation endpoint
 
 ## Tech Stack
 
@@ -96,6 +111,7 @@ App runs at `http://localhost:5173`
 |--------|----------|-------------|------|
 | POST | `/api/auth/register` | Register a new user | No |
 | POST | `/api/auth/login` | Login and get JWT token | No |
+| POST | `/api/auth/admin/create-account` | Create account (admin only) | Yes (Admin) |
 
 ### Projects
 | Method | Endpoint | Description | Auth |
@@ -138,6 +154,28 @@ App runs at `http://localhost:5173`
 | POST | `/api/labels` | Create a label | Yes |
 | DELETE | `/api/labels/{id}` | Delete a label | Yes |
 
+### Notifications
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/notifications` | Get notifications | Yes |
+| POST | `/api/notifications/generate` | Generate overdue/due-soon notifications | Yes |
+| POST | `/api/notifications/mark-read` | Mark all notifications as read | Yes |
+| DELETE | `/api/notifications/{id}` | Dismiss a notification | Yes |
+
+### Task Templates
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/tasktemplates` | Get all templates | Yes |
+| POST | `/api/tasktemplates` | Create a template | Yes |
+| DELETE | `/api/tasktemplates/{id}` | Delete a template | Yes |
+
+### Profile
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/profile` | Get profile info | Yes |
+| PUT | `/api/profile` | Update display name / email | Yes |
+| POST | `/api/profile/avatar` | Upload avatar image | Yes |
+
 ### Dashboard
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
@@ -160,6 +198,8 @@ App runs at `http://localhost:5173`
 | `AddRecurringTasks` | RecurrenceType, RecurrenceSpawned on TaskItem |
 | `AddProjectShareToken` | ShareToken on Project |
 | `AddTaskDependencies` | TaskDependencies join table |
+| `AddNotificationsProfileTemplates` | Notifications, UserProfile, TaskTemplates |
+| `AddIsAdminToUser` | IsAdmin flag on Users |
 
 ## Password Requirements
 
@@ -171,9 +211,22 @@ App runs at `http://localhost:5173`
 
 ## Security
 
-- JWT tokens expire after 7 days
-- Auth endpoints rate limited to 10 requests/minute
+- JWT tokens expire after 7 days, include `isAdmin` claim
+- Auth endpoints rate limited to 5 requests/minute
+- Global API rate limit of 100 requests/minute
 - Passwords hashed with BCrypt
-- Security headers on all responses
+- HTTPS redirect enforced
+- Security headers on all responses: CSP, HSTS, X-Frame-Options, Permissions-Policy, Referrer-Policy
+- `[Consumes("application/json")]` / `[Consumes("multipart/form-data")]` on all mutating endpoints (CSRF mitigation)
 - Input validation on all endpoints
-- `[Consumes("application/json")]` on all mutating endpoints (CSRF mitigation)
+- Path traversal protection on file uploads
+- Reserved usernames (`admin`, `demo`, `testuser`, `anupam`, `snivo`) blocked on public registration
+- Configurable CORS via `AllowedOrigins` in `appsettings.json`
+
+## Production Deployment Checklist
+
+- [ ] Set `JWT__Key` environment variable (32+ character secret)
+- [ ] Update `AllowedOrigins` in `appsettings.json` to your actual domain
+- [ ] Switch SQLite to a production database (PostgreSQL / SQL Server)
+- [ ] Set up HTTPS with a valid certificate
+- [ ] Configure a reverse proxy (nginx / Caddy)
