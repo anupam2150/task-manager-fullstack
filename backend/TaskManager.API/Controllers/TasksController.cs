@@ -113,7 +113,6 @@ public class TasksController(AppDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Consumes("application/json")]
     public async Task<IActionResult> Delete(int projectId, int id)
     {
         if (!await ProjectBelongsToUser(projectId)) return Forbid();
@@ -226,16 +225,16 @@ public class TasksController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> AddLabel(int projectId, int id, int labelId)
     {
         if (!await ProjectBelongsToUser(projectId)) return Forbid();
+        var label = await db.Labels.FirstOrDefaultAsync(l => l.Id == labelId && l.OwnerId == UserId);
+        if (label is null) return NotFound();
         if (await db.TaskLabels.AnyAsync(tl => tl.TaskId == id && tl.LabelId == labelId)) return Ok();
-        var label = await db.Labels.FindAsync(labelId);
         db.TaskLabels.Add(new TaskLabel { TaskId = id, LabelId = labelId });
         await db.SaveChangesAsync();
-        await Log(id, $"Label \"{SanitizeLog(label?.Name ?? labelId.ToString())}\" added");
+        await Log(id, $"Label \"{SanitizeLog(label.Name)}\" added");
         return Ok();
     }
 
     [HttpDelete("{id}/labels/{labelId}")]
-    [Consumes("application/json")]
     public async Task<IActionResult> RemoveLabel(int projectId, int id, int labelId)
     {
         if (!await ProjectBelongsToUser(projectId)) return Forbid();
@@ -287,7 +286,6 @@ public class TasksController(AppDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id}/subtasks/{subId}")]
-    [Consumes("application/json")]
     public async Task<IActionResult> DeleteSubTask(int projectId, int id, int subId)
     {
         if (!await ProjectBelongsToUser(projectId)) return Forbid();
@@ -317,7 +315,6 @@ public class TasksController(AppDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id}/dependencies/{blockerId}")]
-    [Consumes("application/json")]
     public async Task<IActionResult> RemoveDependency(int projectId, int id, int blockerId)
     {
         if (!await ProjectBelongsToUser(projectId)) return Forbid();
@@ -356,7 +353,6 @@ public class TasksController(AppDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id}/comments/{commentId}")]
-    [Consumes("application/json")]
     public async Task<IActionResult> DeleteComment(int projectId, int id, int commentId)
     {
         if (!await ProjectBelongsToUser(projectId)) return Forbid();

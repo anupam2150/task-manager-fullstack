@@ -74,6 +74,7 @@ function MiniBarChart({ done, inProgress, todo, dummy }) {
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -81,7 +82,7 @@ export default function Dashboard() {
     api.get('/dashboard').then(({ data }) => {
       setStats(data);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(() => { setLoading(false); setError(true); });
   }, []);
 
   const isTestAccount = user?.isAdmin === true;
@@ -98,7 +99,14 @@ export default function Dashboard() {
     </div>
   );
 
-  if (!stats) return null;
+  if (error || !stats) return (
+    <div className="page db-page">
+      <div className="db-empty-hint">
+        <div className="db-empty-hint-icon">⚠️</div>
+        <p>Failed to load dashboard. Please refresh the page.</p>
+      </div>
+    </div>
+  );
 
   if (isEmpty && !isTestAccount) return (
     <div className="page db-page">

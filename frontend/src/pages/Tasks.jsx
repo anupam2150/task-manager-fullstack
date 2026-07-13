@@ -2,9 +2,10 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import CalendarView from '../components/CalendarView';
 import TaskTemplates from '../components/TaskTemplates';
+import TaskEditModal from '../components/TaskEditModal';
 import {
   DndContext, PointerSensor, useSensor, useSensors,
-  DragOverlay, closestCorners
+  DragOverlay, closestCorners, useDroppable
 } from '@dnd-kit/core';
 import {
   SortableContext, verticalListSortingStrategy, useSortable
@@ -36,7 +37,7 @@ const getDueBadge = (dueDate, status) => {
   return null;
 };
 
-function TaskCardInner({ task, projectId, onRefresh, labels, allTasks, isDragging }) {
+function TaskCardInner({ task, projectId, onRefresh, labels, allTasks, isDragging, dragHandleListeners, dragHandleAttributes }) {
   const { push } = useNotif();
   const [expanded, setExpanded] = useState(false);
   const [comment, setComment] = useState('');
@@ -187,9 +188,11 @@ function TaskCardInner({ task, projectId, onRefresh, labels, allTasks, isDraggin
   const completedSubs = task.subTasks?.filter(s => s.isCompleted).length ?? 0;
   const totalSubs = task.subTasks?.length ?? 0;
 
+  const [showEdit, setShowEdit] = useState(false);
+
   return (
     <div className={`task-card${isDragging ? ' task-card--dragging' : ''}`}>
-      <div className="task-card-drag-handle" title="Drag to move">⠿</div>
+      <div className="task-card-drag-handle" title="Drag to move" {...dragHandleListeners} {...dragHandleAttributes} style={{ cursor: 'grab', touchAction: 'none' }}>⠿</div>
       <div className="task-card-top">
         <strong>{task.title}</strong>
         <div className="task-card-badges">
@@ -249,9 +252,20 @@ function TaskCardInner({ task, projectId, onRefresh, labels, allTasks, isDraggin
         <button className="btn-icon" onClick={() => setExpanded(e => !e)} title="Details">
           {expanded ? '▲ Hide' : '▼ Details'}
         </button>
+        <button className="btn-icon" onClick={() => setShowEdit(true)} title="Edit task">✏️</button>
         <button className="btn-archive" onClick={handleArchive} title="Archive task">📦</button>
         <button className="btn-delete" onClick={handleDelete}>🗑</button>
       </div>
+
+      {showEdit && (
+        <TaskEditModal
+          task={task}
+          projectId={projectId}
+          onClose={() => setShowEdit(false)}
+          onSaved={onRefresh}
+          push={push}
+        />
+      )}
 
       {expanded && (
         <div className="task-expanded">
@@ -369,15 +383,23 @@ function SortableTaskCard({ task, projectId, onRefresh, labels, allTasks }) {
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes}>
-      <div {...listeners} style={{ cursor: 'grab', touchAction: 'none' }}>
-        <TaskCardInner task={task} projectId={projectId} onRefresh={onRefresh} labels={labels} allTasks={allTasks} isDragging={isDragging} />
-      </div>
+    <div ref={setNodeRef} style={style}>
+      <TaskCardInner
+        task={task}
+        projectId={projectId}
+        onRefresh={onRefresh}
+        labels={labels}
+        allTasks={allTasks}
+        isDragging={isDragging}
+        dragHandleListeners={listeners}
+        dragHandleAttributes={attributes}
+      />
     </div>
   );
 }
 
 function DroppableColumn({ status, tasks, projectId, onRefresh, labels, allTasks }) {
+  const { setNodeRef } = useDroppable({ id: status });
   return (
     <div className={`kanban-col ${COL_CLASS[status]}`}>
       <div className="kanban-col-header">
@@ -385,13 +407,15 @@ function DroppableColumn({ status, tasks, projectId, onRefresh, labels, allTasks
         <span className="col-count">{tasks.length}</span>
       </div>
       <SortableContext items={tasks.map(t => `task-${t.id}`)} strategy={verticalListSortingStrategy}>
-        {tasks.length === 0 ? (
-          <div className="empty-col-drop">Drop tasks here</div>
-        ) : (
-          tasks.map(task => (
-            <SortableTaskCard key={task.id} task={task} projectId={projectId} onRefresh={onRefresh} labels={labels} allTasks={allTasks} />
-          ))
-        )}
+        <div ref={setNodeRef} style={{ minHeight: '60px', flex: 1 }}>
+          {tasks.length === 0 ? (
+            <div className="empty-col-drop">Drop tasks here</div>
+          ) : (
+            tasks.map(task => (
+              <SortableTaskCard key={task.id} task={task} projectId={projectId} onRefresh={onRefresh} labels={labels} allTasks={allTasks} />
+            ))
+          )}
+        </div>
       </SortableContext>
     </div>
   );
@@ -433,6 +457,7 @@ export default function Tasks() {
       ]);
       setTasks(tasksRes.data.items ?? tasksRes.data);
       setLabels(labelsRes.data);
+      setSelectedIds(new Set());
     } catch (err) {
       push(extractError(err, 'Failed to load tasks'), 'error');
     } finally {
@@ -523,16 +548,16 @@ export default function Tasks() {
     } catch { push('Bulk delete failed', 'error'); }
   };
 
+  const pendingSubtasksRef = useRef([]);
+
   const applyTemplate = (template) => {
     const subtasks = template.subtaskTitles ? JSON.parse(template.subtaskTitles) : [];
     setForm(f => ({ ...f, title: template.title, description: template.description ?? '', priority: template.priority }));
+    pendingSubtasksRef.current = subtasks;
     setShowTemplates(false);
     titleInputRef.current?.focus();
     push(`Template "${template.name}" applied`, 'success');
-    // store subtasks to auto-create after task is made
-    applyTemplate._pendingSubtasks = subtasks;
   };
-  applyTemplate._pendingSubtasks = [];
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -541,11 +566,10 @@ export default function Tasks() {
       setSubmitting(true);
       const res = await api.post(`/projects/${safeProjectId}/tasks`, { ...form, dueDate: form.dueDate || null });
       const newTaskId = res.data?.id;
-      // auto-create subtasks from template
-      const pending = applyTemplate._pendingSubtasks ?? [];
+      const pending = pendingSubtasksRef.current;
       if (newTaskId && pending.length > 0) {
         await Promise.all(pending.map(title => api.post(`/projects/${safeProjectId}/tasks/${newTaskId}/subtasks`, { title })));
-        applyTemplate._pendingSubtasks = [];
+        pendingSubtasksRef.current = [];
       }
       setForm({ title: '', description: '', priority: 'Medium', dueDate: '', recurrence: 'None' });
       push('Task created!', 'success');

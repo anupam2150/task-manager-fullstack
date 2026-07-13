@@ -121,7 +121,7 @@ export default function Projects() {
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [projRes, labelRes] = await Promise.all([api.get('/projects?pageSize=100'), api.get('/labels')]);
+      const [projRes, labelRes] = await Promise.all([api.get('/projects?pageSize=10000'), api.get('/labels')]);
       setProjects(projRes.data.items ?? projRes.data);
       setLabels(labelRes.data);
     } catch (err) {

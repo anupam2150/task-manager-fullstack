@@ -19,7 +19,7 @@ public class ProjectsController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         page = Math.Max(1, page);
-        pageSize = Math.Clamp(pageSize, 1, 100);
+        pageSize = Math.Clamp(pageSize, 1, 10000);
         var query = db.Projects.Where(p => p.OwnerId == UserId);
         var total = await query.CountAsync();
         var items = await query
@@ -74,7 +74,6 @@ public class ProjectsController(AppDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Consumes("application/json")]
     public async Task<IActionResult> Delete(int id)
     {
         var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id && p.OwnerId == UserId);
@@ -96,7 +95,6 @@ public class ProjectsController(AppDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id}/share")]
-    [Consumes("application/json")]
     public async Task<IActionResult> RevokeShareToken(int id)
     {
         var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id && p.OwnerId == UserId);

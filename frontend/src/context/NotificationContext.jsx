@@ -24,13 +24,17 @@ export function NotificationProvider({ children }) {
   }, [load]);
 
   const markAllRead = useCallback(async () => {
-    await api.post('/notifications/mark-read');
-    setNotifications(n => n.map(x => ({ ...x, isRead: true })));
+    try {
+      await api.post('/notifications/mark-read');
+      setNotifications(n => n.map(x => ({ ...x, isRead: true })));
+    } catch { /* silent — UI stays consistent */ }
   }, []);
 
   const dismiss = useCallback(async (id) => {
-    await api.delete(`/notifications/${id}`);
-    setNotifications(n => n.filter(x => x.id !== id));
+    try {
+      await api.delete(`/notifications/${id}`);
+      setNotifications(n => n.filter(x => x.id !== id));
+    } catch { /* silent */ }
   }, []);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;

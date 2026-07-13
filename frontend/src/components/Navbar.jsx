@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
 import api from '../api/api';
+
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:5000';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -63,20 +65,20 @@ export default function Navbar() {
   const handleLogout = () => { logout(); navigate('/login'); };
 
   const avatarContent = avatarUrl
-    ? <img src={`http://localhost:5000${avatarUrl}`} alt="avatar" className="avatar avatar-img" />
+    ? <img src={`${API_BASE}${avatarUrl}`} alt="avatar" className="avatar avatar-img" />
     : <div className="avatar">{user?.username?.charAt(0).toUpperCase()}</div>;
 
   return (
     <nav className="navbar">
       <div className="nav-left">
-        <Link to="/" className="brand">
+        <NavLink to="/" className="brand">
           <div className="brand-icon">✓</div>
           TaskManager
-        </Link>
+        </NavLink>
         {user && (
           <div className="nav-links">
-            <Link to="/" className="nav-link">Dashboard</Link>
-            <Link to="/projects" className="nav-link">Projects</Link>
+        <NavLink to="/" end className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>Dashboard</NavLink>
+            <NavLink to="/projects" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>Projects</NavLink>
           </div>
         )}
       </div>

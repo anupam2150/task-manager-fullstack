@@ -78,6 +78,16 @@ builder.Services.AddRateLimiter(opt =>
         o.QueueLimit = 5;
     });
     opt.RejectionStatusCode = 429;
+    opt.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 5
+            }));
 });
 
 builder.Services.AddAuthorization();
@@ -122,13 +132,13 @@ using (var scope = app.Services.CreateScope())
     if (!db.TaskTemplates.Any(t => t.IsSystem))
     {
         db.TaskTemplates.AddRange(
-            new() { OwnerId = 1, IsSystem = true, Category = "Dev", Name = "Bug Report", Title = "Bug: ", Description = "Steps to reproduce:\n1. \n\nExpected:\nActual:", Priority = "High", SubtaskTitles = "[\"Reproduce the bug\",\"Identify root cause\",\"Write fix\",\"Test fix\"]"},
-            new() { OwnerId = 1, IsSystem = true, Category = "Dev", Name = "Feature Request", Title = "Feature: ", Description = "User story: As a user I want to...", Priority = "Medium", SubtaskTitles = "[\"Design\",\"Implement\",\"Write tests\",\"Update docs\"]"},
-            new() { OwnerId = 1, IsSystem = true, Category = "Dev", Name = "Code Review", Title = "Review: ", Description = "PR link:\nFocus areas:", Priority = "Medium", SubtaskTitles = "[\"Check logic\",\"Check edge cases\",\"Check naming\",\"Approve or request changes\"]"},
-            new() { OwnerId = 1, IsSystem = true, Category = "General", Name = "Meeting Notes", Title = "Meeting: ", Description = "Attendees:\nAgenda:\nAction items:", Priority = "Low", SubtaskTitles = "[\"Send agenda\",\"Take notes\",\"Share summary\"]"},
-            new() { OwnerId = 1, IsSystem = true, Category = "General", Name = "Weekly Goals", Title = "Week of ", Description = "Top 3 goals this week:", Priority = "Medium", SubtaskTitles = "[\"Goal 1\",\"Goal 2\",\"Goal 3\",\"Review progress\"]"}
+            new() { OwnerId = null, IsSystem = true, Category = "Dev", Name = "Bug Report", Title = "Bug: ", Description = "Steps to reproduce:\n1. \n\nExpected:\nActual:", Priority = "High", SubtaskTitles = "[\"Reproduce the bug\",\"Identify root cause\",\"Write fix\",\"Test fix\"]"},
+            new() { OwnerId = null, IsSystem = true, Category = "Dev", Name = "Feature Request", Title = "Feature: ", Description = "User story: As a user I want to...", Priority = "Medium", SubtaskTitles = "[\"Design\",\"Implement\",\"Write tests\",\"Update docs\"]"},
+            new() { OwnerId = null, IsSystem = true, Category = "Dev", Name = "Code Review", Title = "Review: ", Description = "PR link:\nFocus areas:", Priority = "Medium", SubtaskTitles = "[\"Check logic\",\"Check edge cases\",\"Check naming\",\"Approve or request changes\"]"},
+            new() { OwnerId = null, IsSystem = true, Category = "General", Name = "Meeting Notes", Title = "Meeting: ", Description = "Attendees:\nAgenda:\nAction items:", Priority = "Low", SubtaskTitles = "[\"Send agenda\",\"Take notes\",\"Share summary\"]"},
+            new() { OwnerId = null, IsSystem = true, Category = "General", Name = "Weekly Goals", Title = "Week of ", Description = "Top 3 goals this week:", Priority = "Medium", SubtaskTitles = "[\"Goal 1\",\"Goal 2\",\"Goal 3\",\"Review progress\"]"}
         );
-        try { db.SaveChanges(); } catch { /* ignore if user 1 doesn't exist */ }
+        db.SaveChanges();
     }
 }
 

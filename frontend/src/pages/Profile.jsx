@@ -3,8 +3,10 @@ import { useAuth } from '../context/AuthContext';
 import { useNotif } from '../context/NotifContext';
 import api from '../api/api';
 
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:5000';
+
 export default function Profile() {
-  const { user, login } = useAuth();
+  const { user, logout } = useAuth();
   const { push } = useNotif();
   const [profile, setProfile] = useState(null);
   const [form, setForm] = useState({ username: '', currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -33,8 +35,8 @@ export default function Profile() {
         newPassword: form.newPassword || null,
       });
       setProfile(data);
-      setForm(f => ({ ...f, currentPassword: '', newPassword: '', confirmPassword: '' }));
-      push('Profile updated!', 'success');
+      setForm(f => ({ ...f, username: data.username, currentPassword: '', newPassword: '', confirmPassword: '' }));
+      push('Profile updated! Please log in again to see your new username in the navbar.', 'success');
     } catch (err) {
       push(err.response?.data || 'Failed to update profile', 'error');
     } finally { setSaving(false); }
@@ -57,7 +59,7 @@ export default function Profile() {
 
   if (!profile) return <div className="page"><p className="loading">Loading profile...</p></div>;
 
-  const avatarSrc = profile.avatarUrl ? `http://localhost:5000${profile.avatarUrl}` : null;
+  const avatarSrc = profile.avatarUrl ? `${API_BASE}${profile.avatarUrl}` : null;
 
   return (
     <div className="page profile-page">

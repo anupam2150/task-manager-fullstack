@@ -34,9 +34,11 @@ export default function TaskTemplates({ onApply }) {
   };
 
   const handleDelete = async (id) => {
-    await api.delete(`/templates/${id}`);
-    setTemplates(t => t.filter(x => x.id !== id));
-    push('Template deleted', 'info');
+    try {
+      await api.delete(`/templates/${id}`);
+      setTemplates(t => t.filter(x => x.id !== id));
+      push('Template deleted', 'info');
+    } catch { push('Failed to delete template', 'error'); }
   };
 
   return (
