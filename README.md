@@ -200,6 +200,7 @@ App runs at `http://localhost:5173`
 | `AddTaskDependencies` | TaskDependencies join table |
 | `AddNotificationsProfileTemplates` | Notifications, UserProfile, TaskTemplates |
 | `AddIsAdminToUser` | IsAdmin flag on Users |
+| `MakeTemplateOwnerNullable` | OwnerId nullable on TaskTemplates (supports system templates) |
 
 ## Password Requirements
 
@@ -217,15 +218,24 @@ App runs at `http://localhost:5173`
 - Passwords hashed with BCrypt
 - HTTPS redirect enforced
 - Security headers on all responses: CSP, HSTS, X-Frame-Options, Permissions-Policy, Referrer-Policy
-- `[Consumes("application/json")]` / `[Consumes("multipart/form-data")]` on all mutating endpoints (CSRF mitigation)
+- `[Consumes("application/json")]` / `[Consumes("multipart/form-data")]` on mutating endpoints (CSRF mitigation)
+- Label ownership validated before assigning to tasks
 - Input validation on all endpoints
 - Path traversal protection on file uploads
 - Reserved usernames (`admin`, `demo`, `testuser`, `anupam`, `snivo`) blocked on public registration
 - Configurable CORS via `AllowedOrigins` in `appsettings.json`
 
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `JWT__Key` | Yes | Secret key for JWT signing (min 32 characters) |
+| `VITE_API_URL` | No | Backend base URL for frontend (default: `http://localhost:5000`) |
+
 ## Production Deployment Checklist
 
 - [ ] Set `JWT__Key` environment variable (32+ character secret)
+- [ ] Set `VITE_API_URL` in frontend `.env` to your backend domain
 - [ ] Update `AllowedOrigins` in `appsettings.json` to your actual domain
 - [ ] Switch SQLite to a production database (PostgreSQL / SQL Server)
 - [ ] Set up HTTPS with a valid certificate
