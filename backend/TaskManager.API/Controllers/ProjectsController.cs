@@ -74,6 +74,7 @@ public class ProjectsController(AppDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Consumes("application/json")]
     public async Task<IActionResult> Delete(int id)
     {
         var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id && p.OwnerId == UserId);
@@ -95,6 +96,7 @@ public class ProjectsController(AppDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id}/share")]
+    [Consumes("application/json")]
     public async Task<IActionResult> RevokeShareToken(int id)
     {
         var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id && p.OwnerId == UserId);

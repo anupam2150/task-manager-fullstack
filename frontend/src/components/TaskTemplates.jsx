@@ -9,7 +9,7 @@ export default function TaskTemplates({ onApply }) {
   const { push } = useNotif();
 
   useEffect(() => {
-    api.get('/templates').then(({ data }) => setTemplates(data)).catch(() => {});
+    api.get('/tasktemplates').then(({ data }) => setTemplates(data)).catch(() => {});
   }, []);
 
   const grouped = templates.reduce((acc, t) => {
@@ -21,7 +21,7 @@ export default function TaskTemplates({ onApply }) {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      const { data } = await api.post('/templates', {
+      const { data } = await api.post('/tasktemplates', {
         name: form.name, category: form.category, title: form.title,
         description: form.description, priority: form.priority,
         subtaskTitles: form.subtasks ? JSON.stringify(form.subtasks.split('\n').filter(Boolean)) : null,
@@ -35,7 +35,7 @@ export default function TaskTemplates({ onApply }) {
 
   const handleDelete = async (id) => {
     try {
-      await api.delete(`/templates/${id}`);
+      await api.delete(`/tasktemplates/${id}`);
       setTemplates(t => t.filter(x => x.id !== id));
       push('Template deleted', 'info');
     } catch { push('Failed to delete template', 'error'); }

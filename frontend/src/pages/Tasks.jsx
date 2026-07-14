@@ -519,12 +519,6 @@ export default function Tasks() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const toggleSelect = (id) => setSelectedIds(prev => {
-    const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
-  });
-
   const handleBulkStatus = async (status) => {
     try {
       await Promise.all([...selectedIds].map(id => {
