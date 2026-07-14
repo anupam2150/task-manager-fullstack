@@ -2,7 +2,6 @@ using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using TaskManager.API.Data;
@@ -61,22 +60,6 @@ builder.Services.AddCors(opt =>
 
 builder.Services.AddRateLimiter(opt =>
 {
-    // Auth endpoints: 5 requests per minute (brute-force protection)
-    opt.AddFixedWindowLimiter("auth", o =>
-    {
-        o.PermitLimit = 5;
-        o.Window = TimeSpan.FromMinutes(1);
-        o.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        o.QueueLimit = 0;
-    });
-    // Global limit: 100 requests per minute per client
-    opt.AddFixedWindowLimiter("global", o =>
-    {
-        o.PermitLimit = 100;
-        o.Window = TimeSpan.FromMinutes(1);
-        o.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        o.QueueLimit = 5;
-    });
     opt.RejectionStatusCode = 429;
     opt.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
         RateLimitPartition.GetFixedWindowLimiter(

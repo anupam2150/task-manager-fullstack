@@ -6,7 +6,7 @@ import api from '../api/api';
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:5000';
 
 export default function Profile() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { push } = useNotif();
   const [profile, setProfile] = useState(null);
   const [form, setForm] = useState({ username: '', currentPassword: '', newPassword: '', confirmPassword: '' });

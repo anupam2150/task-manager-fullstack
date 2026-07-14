@@ -53,7 +53,6 @@ const extractError = (err, fallback) => {
 };
 
 const LABEL_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#0ea5e9','#f97316','#ec4899'];
-const CARD_ACCENTS = ['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#0ea5e9','#f97316','#ec4899'];
 
 function NewProjectModal({ onClose, onCreated, push }) {
   const [form, setForm] = useState({ name: '', description: '' });
@@ -131,7 +130,6 @@ export default function Projects() {
     }
   }, [push]);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   const handleDelete = async (id, name) => {
@@ -254,7 +252,7 @@ export default function Projects() {
           <p className="section-title">{(showDummy ? DUMMY_PROJECTS : projects).length} Project{(showDummy ? DUMMY_PROJECTS : projects).length !== 1 ? 's' : ''}</p>
           <div className="projects-grid">
             {(showDummy ? DUMMY_PROJECTS : projects).map((p, i) => {
-              const accent = CARD_ACCENTS[i % CARD_ACCENTS.length];
+              const accent = LABEL_COLORS[i % LABEL_COLORS.length];
               const pct = p.taskCount > 0 ? Math.round((p.completedCount / p.taskCount) * 100) : 0;
               const isDummy = showDummy;
               return (
